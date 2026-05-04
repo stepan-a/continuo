@@ -37,10 +37,15 @@ cache:
 
 lint:
   stage: lint
+  only:
+    - master@stepan/dynare-ct
   script:
     - pip install --quiet ruff
     - ruff check src tests
     - ruff format --check src tests
+  tags:
+    - stepan@puck
+
 
 # ---------------------------------------------------------------------------
 # Test stage — install the package with dev extras and run pytest.
@@ -48,6 +53,10 @@ lint:
 
 test:
   stage: test
+  only:
+    - master@stepan/dynare-ct
   script:
     - pip install --quiet -e ".[dev]"
     - pytest -q --tb=short
+  tags:
+    - stepan@puck
