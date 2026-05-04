@@ -1,0 +1,41 @@
+// dynare-ct grammar — step 1: declarations only.
+//
+// Covers:
+//   - var declarations, with optional (state) / (jump) qualifier
+//   - varexo declarations
+//   - parameters declarations
+//   - parameter-value assignments (literal numbers only for now)
+//   - line and block comments
+//
+// The expression sub-grammar is step 2; until then, parameter values
+// must be plain numeric literals.
+
+start: statement+
+
+?statement: var_decl
+          | varexo_decl
+          | parameters_decl
+          | param_value
+
+var_decl: "var" var_qualifier ident_list ";"  -> var_decl_qualified
+        | "var" ident_list ";"                 -> var_decl_unqualified
+
+var_qualifier: "(" IDENT ")"
+
+varexo_decl: "varexo" ident_list ";"
+
+parameters_decl: "parameters" ident_list ";"
+
+param_value: IDENT "=" NUMBER ";"
+
+ident_list: IDENT ("," IDENT)*
+
+IDENT: /[A-Za-z_][A-Za-z0-9_]*/
+NUMBER: /\d+(\.\d+)?([eE][+-]?\d+)?/
+
+COMMENT_LINE: /\/\/[^\n]*/
+COMMENT_BLOCK: /\/\*[\s\S]*?\*\//
+
+%ignore COMMENT_LINE
+%ignore COMMENT_BLOCK
+%ignore /\s+/
