@@ -1,0 +1,76 @@
+[build-system]
+requires = ["hatchling>=1.18"]
+build-backend = "hatchling.build"
+
+[project]
+name = "dynare-ct"
+version = "0.0.1"
+description = "Continuous-time DSGE toolbox in the spirit of Dynare."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+authors = [
+    { name = "Stéphane Adjemian", email = "stepan@adjemian.eu" },
+]
+keywords = [
+    "DSGE",
+    "macroeconomics",
+    "continuous-time",
+    "perfect-foresight",
+    "BVP",
+    "DAE",
+]
+classifiers = [
+    "Development Status :: 1 - Planning",
+    "Intended Audience :: Science/Research",
+    "License :: Public Domain",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Mathematics",
+]
+dependencies = [
+    "casadi>=3.6",
+    "scipy>=1.11",
+    "numpy>=1.26",
+    "lark>=1.1",
+]
+
+[project.optional-dependencies]
+pandas = ["pandas>=2.0"]
+xarray = ["xarray>=2023.1"]
+hdf5 = ["h5py>=3.9"]
+all = [
+    "pandas>=2.0",
+    "xarray>=2023.1",
+    "h5py>=3.9",
+]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "ruff>=0.5",
+]
+
+[project.scripts]
+dynare-ct = "dynare_ct.cli:main"
+
+[project.urls]
+Homepage = "https://git.ithaca.fr/stepan/dynare-ct"
+Repository = "https://git.ithaca.fr/stepan/dynare-ct"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/dynare_ct"]
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["tests"]
+addopts = "-ra"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]

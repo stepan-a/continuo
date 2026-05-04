@@ -1,0 +1,53 @@
+# GitLab CI for dynare-ct.
+#
+# Designed for a shell-executor runner (no Docker) on Debian stable
+# with Python 3.13 available as `python3.13`. Each job creates a
+# workspace-local venv, installs dependencies into it, and runs the
+# job inside it — keeping pipelines isolated from the system Python
+# and from other repos on the same runner.
+#
+# To restrict jobs to a particular runner, add a `tags:` list to each
+# job (or to the `default:` block) matching tags configured on the
+# GitLab runner.
+
+default:
+  before_script:
+    - python3.13 -m venv .venv-ci
+    - source .venv-ci/bin/activate
+    - python -m pip install --quiet --upgrade pip
+
+stages:
+  - lint
+  - test
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  PYTHONDONTWRITEBYTECODE: "1"
+
+cache:
+  key:
+    files:
+      - pyproject.toml
+  paths:
+    - .cache/pip
+
+# ---------------------------------------------------------------------------
+# Lint stage — fast, no heavy dependencies.
+# ---------------------------------------------------------------------------
+
+lint:
+  stage: lint
+  script:
+    - pip install --quiet ruff
+    - ruff check src tests
+    - ruff format --check src tests
+
+# ---------------------------------------------------------------------------
+# Test stage — install the package with dev extras and run pytest.
+# ---------------------------------------------------------------------------
+
+test:
+  stage: test
+  script:
+    - pip install --quiet -e ".[dev]"
+    - pytest -q --tb=short
