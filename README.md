@@ -1,5 +1,7 @@
 # dynare-ct
 
+[![pipeline status](https://git.ithaca.fr/stepan/dynare-ct/badges/master/pipeline.svg)](https://git.ithaca.fr/stepan/dynare-ct/-/pipelines)
+
 Continuous-time DSGE toolbox in the spirit of Dynare. A Python toolbox
 for solving continuous-time macroeconomic models, with perfect-foresight
 deterministic transitions, multi-revelation surprises, and permanent
