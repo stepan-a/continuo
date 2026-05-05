@@ -1,9 +1,10 @@
 """AST node dataclasses for the dynare-ct parser.
 
 Covers declarations (var / varexo / parameters), parameter-value
-assignments, and the expression sub-grammar (arithmetic, comparison,
-logical, unary, function calls). New node types land as the grammar
-grows to encompass the model block, initval, shocks, etc.
+assignments, the expression sub-grammar (arithmetic, comparison,
+logical, unary, function calls, dict literals, string literals), and
+the model block (equations with optional tags). New node types land as
+the grammar grows to encompass initval, shocks, etc.
 """
 
 from __future__ import annotations
@@ -46,6 +47,12 @@ class NumberLit:
 
 
 @dataclass
+class StringLit:
+    value: str  # quotes stripped
+    pos: SourcePos | None = None
+
+
+@dataclass
 class UnaryOp:
     op: str  # "-", "!"
     operand: Expr
@@ -62,14 +69,66 @@ class BinaryOp:
 
 
 @dataclass
+class KeywordArg:
+    """A single ``name=value`` pair inside a function-call argument list."""
+
+    name: Identifier
+    value: Expr
+    pos: SourcePos | None = None
+
+
+@dataclass
 class FunctionCall:
     name: Identifier
-    args: list[Expr]
+    args: list[Expr] = field(default_factory=list)
+    kwargs: list[KeywordArg] = field(default_factory=list)
+    pos: SourcePos | None = None
+
+
+@dataclass
+class DictEntry:
+    """A single ``key: value`` entry inside a dict literal."""
+
+    key: Identifier
+    value: Expr
+    pos: SourcePos | None = None
+
+
+@dataclass
+class DictLiteral:
+    entries: list[DictEntry] = field(default_factory=list)
     pos: SourcePos | None = None
 
 
 # Discriminated union of expression-valued nodes.
-Expr = NumberLit | Identifier | UnaryOp | BinaryOp | FunctionCall
+Expr = NumberLit | StringLit | Identifier | UnaryOp | BinaryOp | FunctionCall | DictLiteral
+
+
+# ---------------------------------------------------------------------------
+# Equations and the model block
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class Equation:
+    """A single equation inside a model block.
+
+    Two surface forms are accepted:
+
+    - explicit ``LHS = RHS;``  → ``lhs`` is the LHS expression.
+    - bare ``expr;``           → ``lhs is None``; the equation is ``expr == 0``.
+    """
+
+    lhs: Expr | None
+    rhs: Expr
+    tags: dict[str, str] = field(default_factory=dict)
+    pos: SourcePos | None = None
+
+
+@dataclass
+class ModelBlock:
+    equations: list[Equation] = field(default_factory=list)
+    pos: SourcePos | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -104,8 +163,8 @@ class ParameterValue:
 
 
 # Discriminated union of top-level statements. Will gain members
-# (ModelBlock, InitvalBlock, ShocksBlock, …) as the grammar grows.
-Statement = VarDecl | VarexoDecl | ParameterDecl | ParameterValue
+# (InitvalBlock, ShocksBlock, …) as the grammar grows.
+Statement = VarDecl | VarexoDecl | ParameterDecl | ParameterValue | ModelBlock
 
 
 @dataclass

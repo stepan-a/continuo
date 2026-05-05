@@ -11,9 +11,18 @@
 //   - logical: && || (and unary !)
 //   - unary minus
 //   - parenthesised expressions
-//   - function calls: f(), f(a), f(a, b, ...)
+//   - function calls: f(), f(a), f(a, b, ...), f(a, x=b)
+//   - dict literals: {}, {k: v, ...}
+//   - string literals: 'single-quoted' or "double-quoted"
 //
-// Parameter-value statements: name = expr;
+// Statements:
+//   - parameter-value assignments: name = expr;
+//   - model block: model; <equation>* end;
+//
+// Equations (inside the model block):
+//   - explicit:        [tags?] LHS = RHS ;
+//   - bare expression: [tags?] expr ;     (interpreted as expr = 0)
+//   - equation tags:   [key='value', key='value', ...]
 //
 // Comments: // line and /* block */.
 //
@@ -26,7 +35,8 @@
 //   * /
 //   unary -
 //   ^
-//   atom (number, identifier, function call, parenthesised expression)
+//   atom (number, string, identifier, function call, dict literal,
+//         parenthesised expression)
 
 start: statement+
 
@@ -34,6 +44,7 @@ start: statement+
           | varexo_decl
           | parameters_decl
           | param_value
+          | model_block
 
 // --- declarations -----------------------------------------------------------
 
@@ -49,6 +60,20 @@ parameters_decl: "parameters" ident_list ";"
 param_value: IDENT "=" expr ";"
 
 ident_list: IDENT ("," IDENT)*
+
+// --- model block ------------------------------------------------------------
+
+model_block: "model" ";" equation* "end" ";"
+
+equation: tags equation_body ";"  -> equation_with_tags
+        | equation_body ";"        -> equation_without_tags
+
+equation_body: expr "=" expr  -> equation_eq
+             | expr             -> equation_zero
+
+tags: "[" tag ("," tag)* "]"
+
+tag: IDENT "=" STRING
 
 // --- expressions ------------------------------------------------------------
 
@@ -79,17 +104,31 @@ ident_list: IDENT ("," IDENT)*
          | atom
 
 ?atom: number_atom
+     | string_atom
+     | dict_literal
      | func_call
      | ident_atom
      | "(" expr ")"
 
 number_atom: NUMBER
+string_atom: STRING
 ident_atom: IDENT
 
-func_call: IDENT "(" ")"           -> func_call_no_args
-         | IDENT "(" arg_list ")"  -> func_call_with_args
+dict_literal: "{" "}"                     -> dict_empty
+            | "{" dict_entries "}"         -> dict_nonempty
 
-arg_list: expr ("," expr)*
+dict_entries: dict_entry ("," dict_entry)*
+
+dict_entry: IDENT ":" expr
+
+func_call: IDENT "(" ")"           -> func_call_no_args
+         | IDENT "(" arg_list ")"   -> func_call_with_args
+
+arg_list: arg ("," arg)*
+
+?arg: kwarg | expr
+
+kwarg: IDENT "=" expr
 
 // --- terminals --------------------------------------------------------------
 
@@ -99,6 +138,7 @@ MUL_OP: "*" | "/"
 
 IDENT: /[A-Za-z_][A-Za-z0-9_]*/
 NUMBER: /\d+(\.\d+)?([eE][+-]?\d+)?/
+STRING: /'[^'\n]*'/ | /"[^"\n]*"/
 
 COMMENT_LINE: /\/\/[^\n]*/
 COMMENT_BLOCK: /\/\*[\s\S]*?\*\//
