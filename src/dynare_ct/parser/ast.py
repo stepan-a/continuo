@@ -16,7 +16,7 @@ from enum import Enum
 
 
 class VarKind(Enum):
-    """Endogenous variable classification — see DESIGN, "Variable classification"."""
+    """Endogenous variable classification: state, jump, or algebraic."""
 
     STATE = "state"
     JUMP = "jump"
