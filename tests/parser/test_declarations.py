@@ -1,4 +1,4 @@
-"""Tests for parser step 1: declaration statements only."""
+"""Tests for parsing declaration statements (var, varexo, parameters)."""
 
 from __future__ import annotations
 

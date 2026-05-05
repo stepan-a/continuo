@@ -1,7 +1,9 @@
 """AST node dataclasses for the dynare-ct parser.
 
-Step 1 covers declaration statements only. New node types land as the
-grammar grows (expressions in step 2, the model block in step 3, …).
+Covers declarations (var / varexo / parameters), parameter-value
+assignments, and the expression sub-grammar (arithmetic, comparison,
+logical, unary, function calls). New node types land as the grammar
+grows to encompass the model block, initval, shocks, etc.
 """
 
 from __future__ import annotations
@@ -26,6 +28,11 @@ class SourcePos:
     column: int
 
 
+# ---------------------------------------------------------------------------
+# Expressions
+# ---------------------------------------------------------------------------
+
+
 @dataclass
 class Identifier:
     name: str
@@ -36,6 +43,38 @@ class Identifier:
 class NumberLit:
     value: float
     pos: SourcePos | None = None
+
+
+@dataclass
+class UnaryOp:
+    op: str  # "-", "!"
+    operand: Expr
+    pos: SourcePos | None = None
+
+
+@dataclass
+class BinaryOp:
+    op: str  # "+", "-", "*", "/", "^",
+    #         "<", "<=", ">", ">=", "==", "!=", "&&", "||"
+    left: Expr
+    right: Expr
+    pos: SourcePos | None = None
+
+
+@dataclass
+class FunctionCall:
+    name: Identifier
+    args: list[Expr]
+    pos: SourcePos | None = None
+
+
+# Discriminated union of expression-valued nodes.
+Expr = NumberLit | Identifier | UnaryOp | BinaryOp | FunctionCall
+
+
+# ---------------------------------------------------------------------------
+# Declarations and statements
+# ---------------------------------------------------------------------------
 
 
 @dataclass
@@ -60,13 +99,12 @@ class ParameterDecl:
 @dataclass
 class ParameterValue:
     name: Identifier
-    value: NumberLit
+    value: Expr
     pos: SourcePos | None = None
 
 
-# Discriminated union of statements parsed at step 1. Will gain members
-# (ModelBlock, InitvalBlock, ShocksBlock, …) as later steps extend the
-# grammar.
+# Discriminated union of top-level statements. Will gain members
+# (ModelBlock, InitvalBlock, ShocksBlock, …) as the grammar grows.
 Statement = VarDecl | VarexoDecl | ParameterDecl | ParameterValue
 
 

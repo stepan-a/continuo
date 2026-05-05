@@ -1,14 +1,32 @@
-// dynare-ct grammar — step 1: declarations only.
+// dynare-ct grammar.
 //
-// Covers:
+// Declarations:
 //   - var declarations, with optional (state) / (jump) qualifier
 //   - varexo declarations
 //   - parameters declarations
-//   - parameter-value assignments (literal numbers only for now)
-//   - line and block comments
 //
-// The expression sub-grammar is step 2; until then, parameter values
-// must be plain numeric literals.
+// Expressions:
+//   - arithmetic: + - * / ^ (^ right-associative)
+//   - comparison: < <= > >= == != (non-chainable; left-associative)
+//   - logical: && || (and unary !)
+//   - unary minus
+//   - parenthesised expressions
+//   - function calls: f(), f(a), f(a, b, ...)
+//
+// Parameter-value statements: name = expr;
+//
+// Comments: // line and /* block */.
+//
+// Operator precedence, low → high:
+//   ||
+//   &&
+//   !
+//   < <= > >= == !=
+//   + -
+//   * /
+//   unary -
+//   ^
+//   atom (number, identifier, function call, parenthesised expression)
 
 start: statement+
 
@@ -16,6 +34,8 @@ start: statement+
           | varexo_decl
           | parameters_decl
           | param_value
+
+// --- declarations -----------------------------------------------------------
 
 var_decl: "var" var_qualifier ident_list ";"  -> var_decl_qualified
         | "var" ident_list ";"                 -> var_decl_unqualified
@@ -26,9 +46,56 @@ varexo_decl: "varexo" ident_list ";"
 
 parameters_decl: "parameters" ident_list ";"
 
-param_value: IDENT "=" NUMBER ";"
+param_value: IDENT "=" expr ";"
 
 ident_list: IDENT ("," IDENT)*
+
+// --- expressions ------------------------------------------------------------
+
+?expr: or_expr
+
+?or_expr: or_expr "||" and_expr  -> or_op
+        | and_expr
+
+?and_expr: and_expr "&&" not_expr  -> and_op
+         | not_expr
+
+?not_expr: "!" not_expr  -> not_op
+         | cmp_expr
+
+?cmp_expr: add_expr CMP_OP add_expr  -> cmp_op
+         | add_expr
+
+?add_expr: add_expr ADD_OP mul_expr  -> add_op
+         | mul_expr
+
+?mul_expr: mul_expr MUL_OP unary_expr  -> mul_op
+         | unary_expr
+
+?unary_expr: "-" unary_expr  -> neg_op
+           | pow_expr
+
+?pow_expr: atom "^" unary_expr  -> pow_op
+         | atom
+
+?atom: number_atom
+     | func_call
+     | ident_atom
+     | "(" expr ")"
+
+number_atom: NUMBER
+ident_atom: IDENT
+
+func_call: IDENT "(" ")"           -> func_call_no_args
+         | IDENT "(" arg_list ")"  -> func_call_with_args
+
+arg_list: expr ("," expr)*
+
+// --- terminals --------------------------------------------------------------
+
+CMP_OP: "<=" | ">=" | "==" | "!=" | "<" | ">"
+ADD_OP: "+" | "-"
+MUL_OP: "*" | "/"
 
 IDENT: /[A-Za-z_][A-Za-z0-9_]*/
 NUMBER: /\d+(\.\d+)?([eE][+-]?\d+)?/
