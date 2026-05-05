@@ -26,6 +26,7 @@ from dynare_ct.parser.ast import (
     ShocksBlock,
     SourcePos,
     Statement,
+    SteadyStateModelBlock,
     StringLit,
     UnaryOp,
     VarDecl,
@@ -162,6 +163,11 @@ class ASTBuilder(Transformer):
                 f"column {time_var_token.column}; got {time_var_token.value!r}"
             )
         return PathAssignment(reveal_time=reveal_time, path=path_expr)
+
+    # --- steady_state_model block --------------------------------------
+
+    def steady_state_model_block(self, *assignments: Assignment) -> SteadyStateModelBlock:
+        return SteadyStateModelBlock(assignments=list(assignments))
 
     # --- expressions: atoms --------------------------------------------
 

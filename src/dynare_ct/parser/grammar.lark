@@ -21,6 +21,7 @@
 //   - initval block: initval [(steady [, kwarg, ...])]; <assignment>* end;
 //   - initial_guess block: initial_guess; <assignment>* end;
 //   - shocks block: shocks; (var <name>; <path>+)* end;
+//   - steady_state_model block: steady_state_model; <assignment>* end;
 //
 // Path assignments inside a shocks block:
 //   - path = <expr>;                              (default reveal time t=0)
@@ -55,6 +56,7 @@ start: statement+
           | initval_block
           | initial_guess_block
           | shocks_block
+          | steady_state_model_block
 
 // --- declarations -----------------------------------------------------------
 
@@ -103,6 +105,10 @@ shock_entry: "var" IDENT ";" path_assignment+
 
 path_assignment: "path" "=" expr ";"                          -> path_default
                | "path" "at" IDENT "=" expr "=" expr ";"      -> path_at_explicit
+
+// --- steady_state_model block ----------------------------------------------
+
+steady_state_model_block: "steady_state_model" ";" assignment* "end" ";"
 
 // --- expressions ------------------------------------------------------------
 

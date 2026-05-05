@@ -4,9 +4,9 @@ Covers declarations (var / varexo / parameters), parameter-value
 assignments, the expression sub-grammar (arithmetic, comparison,
 logical, unary, function calls, dict literals, string literals), the
 model block (equations with optional tags), the initval / initial_guess
-blocks, and the shocks block (with multi-revelation path assignments).
-New node types land as the grammar grows to encompass
-steady_state_model, the simulate/steady commands, etc.
+blocks, the shocks block (with multi-revelation path assignments), and
+the steady_state_model block. The simulate / steady commands are still
+to come.
 """
 
 from __future__ import annotations
@@ -216,6 +216,26 @@ class ShocksBlock:
 
 
 # ---------------------------------------------------------------------------
+# Analytical steady state
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class SteadyStateModelBlock:
+    """Analytical steady state defined as ``x_ss = h(θ, e)``.
+
+    The IR layer enforces:
+      - LHS of every assignment is a declared endogenous variable
+        (``var``, of any subtype) — never a ``varexo`` or ``parameter``;
+      - when the block is present it must be complete (cover every
+        endogenous variable) for v1.
+    """
+
+    assignments: list[Assignment] = field(default_factory=list)
+    pos: SourcePos | None = None
+
+
+# ---------------------------------------------------------------------------
 # Declarations and statements
 # ---------------------------------------------------------------------------
 
@@ -246,9 +266,8 @@ class ParameterValue:
     pos: SourcePos | None = None
 
 
-# Discriminated union of top-level statements. Will gain members
-# (SteadyStateModelBlock, simulate/steady commands, …) as the grammar
-# grows.
+# Discriminated union of top-level statements. Will gain members for
+# the simulate / steady commands as the grammar grows.
 Statement = (
     VarDecl
     | VarexoDecl
@@ -258,6 +277,7 @@ Statement = (
     | InitvalBlock
     | InitialGuessBlock
     | ShocksBlock
+    | SteadyStateModelBlock
 )
 
 
