@@ -22,6 +22,8 @@
 //   - initial_guess block: initial_guess; <assignment>* end;
 //   - shocks block: shocks; (var <name>; <path>+)* end;
 //   - steady_state_model block: steady_state_model; <assignment>* end;
+//   - simulate command: simulate(<arg_list>);
+//   - steady command:   steady; OR steady(<arg_list>);
 //
 // Path assignments inside a shocks block:
 //   - path = <expr>;                              (default reveal time t=0)
@@ -57,6 +59,8 @@ start: statement+
           | initial_guess_block
           | shocks_block
           | steady_state_model_block
+          | simulate_command
+          | steady_command
 
 // --- declarations -----------------------------------------------------------
 
@@ -109,6 +113,13 @@ path_assignment: "path" "=" expr ";"                          -> path_default
 // --- steady_state_model block ----------------------------------------------
 
 steady_state_model_block: "steady_state_model" ";" assignment* "end" ";"
+
+// --- commands ---------------------------------------------------------------
+
+simulate_command: "simulate" "(" arg_list ")" ";"
+
+steady_command: "steady" ";"                       -> steady_bare
+              | "steady" "(" arg_list ")" ";"      -> steady_with_args
 
 // --- expressions ------------------------------------------------------------
 

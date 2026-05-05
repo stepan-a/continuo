@@ -4,9 +4,8 @@ Covers declarations (var / varexo / parameters), parameter-value
 assignments, the expression sub-grammar (arithmetic, comparison,
 logical, unary, function calls, dict literals, string literals), the
 model block (equations with optional tags), the initval / initial_guess
-blocks, the shocks block (with multi-revelation path assignments), and
-the steady_state_model block. The simulate / steady commands are still
-to come.
+blocks, the shocks block (with multi-revelation path assignments), the
+steady_state_model block, and the simulate / steady commands.
 """
 
 from __future__ import annotations
@@ -236,6 +235,42 @@ class SteadyStateModelBlock:
 
 
 # ---------------------------------------------------------------------------
+# Commands: simulate / steady
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class SimulateCommand:
+    """Run the perfect-foresight solver.
+
+    The grammar accepts any positional / keyword arguments; the IR
+    layer enforces that ``T`` and ``N`` are present (mandatory),
+    ``scheme`` is one of the supported discretisation schemes, and no
+    unknown keys appear.
+    """
+
+    args: list[Expr] = field(default_factory=list)
+    kwargs: list[KeywordArg] = field(default_factory=list)
+    pos: SourcePos | None = None
+
+
+@dataclass
+class SteadyCommand:
+    """Compute and report a steady state for inspection / diagnostics.
+
+    Bare ``steady;`` defaults to ``t = T`` under the final information
+    set. The optional argument list may carry ``t=…`` (which point on
+    the simulated horizon) and / or ``e={…}`` (an explicit exogenous
+    configuration) — see /Steady state and initial conditions/ in the
+    design document. Validation lives in the IR.
+    """
+
+    args: list[Expr] = field(default_factory=list)
+    kwargs: list[KeywordArg] = field(default_factory=list)
+    pos: SourcePos | None = None
+
+
+# ---------------------------------------------------------------------------
 # Declarations and statements
 # ---------------------------------------------------------------------------
 
@@ -266,8 +301,7 @@ class ParameterValue:
     pos: SourcePos | None = None
 
 
-# Discriminated union of top-level statements. Will gain members for
-# the simulate / steady commands as the grammar grows.
+# Discriminated union of top-level statements.
 Statement = (
     VarDecl
     | VarexoDecl
@@ -278,6 +312,8 @@ Statement = (
     | InitialGuessBlock
     | ShocksBlock
     | SteadyStateModelBlock
+    | SimulateCommand
+    | SteadyCommand
 )
 
 

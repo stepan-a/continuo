@@ -24,8 +24,10 @@ from dynare_ct.parser.ast import (
     PathAssignment,
     ShockEntry,
     ShocksBlock,
+    SimulateCommand,
     SourcePos,
     Statement,
+    SteadyCommand,
     SteadyStateModelBlock,
     StringLit,
     UnaryOp,
@@ -168,6 +170,19 @@ class ASTBuilder(Transformer):
 
     def steady_state_model_block(self, *assignments: Assignment) -> SteadyStateModelBlock:
         return SteadyStateModelBlock(assignments=list(assignments))
+
+    # --- commands ------------------------------------------------------
+
+    def simulate_command(self, args_split: tuple[list[Expr], list[KeywordArg]]) -> SimulateCommand:
+        positional, keywords = args_split
+        return SimulateCommand(args=positional, kwargs=keywords)
+
+    def steady_bare(self) -> SteadyCommand:
+        return SteadyCommand(args=[], kwargs=[])
+
+    def steady_with_args(self, args_split: tuple[list[Expr], list[KeywordArg]]) -> SteadyCommand:
+        positional, keywords = args_split
+        return SteadyCommand(args=positional, kwargs=keywords)
 
     # --- expressions: atoms --------------------------------------------
 
