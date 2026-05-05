@@ -20,6 +20,11 @@
 //   - model block: model; <equation>* end;
 //   - initval block: initval [(steady [, kwarg, ...])]; <assignment>* end;
 //   - initial_guess block: initial_guess; <assignment>* end;
+//   - shocks block: shocks; (var <name>; <path>+)* end;
+//
+// Path assignments inside a shocks block:
+//   - path = <expr>;                              (default reveal time t=0)
+//   - path at t = <expr> = <expr>;                (explicit reveal time)
 //
 // Equations (inside the model block):
 //   - explicit:        [tags?] LHS = RHS ;
@@ -49,6 +54,7 @@ start: statement+
           | model_block
           | initval_block
           | initial_guess_block
+          | shocks_block
 
 // --- declarations -----------------------------------------------------------
 
@@ -88,6 +94,15 @@ initval_block: "initval" ";" assignment* "end" ";"                              
 initial_guess_block: "initial_guess" ";" assignment* "end" ";"
 
 assignment: expr "=" expr ";"
+
+// --- shocks block -----------------------------------------------------------
+
+shocks_block: "shocks" ";" shock_entry* "end" ";"
+
+shock_entry: "var" IDENT ";" path_assignment+
+
+path_assignment: "path" "=" expr ";"                          -> path_default
+               | "path" "at" IDENT "=" expr "=" expr ";"      -> path_at_explicit
 
 // --- expressions ------------------------------------------------------------
 

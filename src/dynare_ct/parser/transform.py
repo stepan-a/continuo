@@ -21,6 +21,9 @@ from dynare_ct.parser.ast import (
     NumberLit,
     ParameterDecl,
     ParameterValue,
+    PathAssignment,
+    ShockEntry,
+    ShocksBlock,
     SourcePos,
     Statement,
     StringLit,
@@ -133,6 +136,32 @@ class ASTBuilder(Transformer):
 
     def assignment(self, lhs: Expr, rhs: Expr) -> Assignment:
         return Assignment(lhs=lhs, rhs=rhs)
+
+    # --- shocks block --------------------------------------------------
+
+    def shocks_block(self, *entries: ShockEntry) -> ShocksBlock:
+        return ShocksBlock(entries=list(entries))
+
+    def shock_entry(self, name_token: Token, *paths: PathAssignment) -> ShockEntry:
+        return ShockEntry(
+            name=Identifier(name=name_token.value, pos=_pos(name_token)),
+            paths=list(paths),
+        )
+
+    def path_default(self, path_expr: Expr) -> PathAssignment:
+        return PathAssignment(reveal_time=None, path=path_expr)
+
+    def path_at_explicit(
+        self, time_var_token: Token, reveal_time: Expr, path_expr: Expr
+    ) -> PathAssignment:
+        # The grammar accepts any IDENT after `path at`; we require it to
+        # be the reserved continuous-time variable `t`.
+        if time_var_token.value != "t":
+            raise SyntaxError(
+                f"expected 't' after 'path at' at line {time_var_token.line}, "
+                f"column {time_var_token.column}; got {time_var_token.value!r}"
+            )
+        return PathAssignment(reveal_time=reveal_time, path=path_expr)
 
     # --- expressions: atoms --------------------------------------------
 

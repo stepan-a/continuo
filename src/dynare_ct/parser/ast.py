@@ -3,9 +3,10 @@
 Covers declarations (var / varexo / parameters), parameter-value
 assignments, the expression sub-grammar (arithmetic, comparison,
 logical, unary, function calls, dict literals, string literals), the
-model block (equations with optional tags), and the initval /
-initial_guess blocks. New node types land as the grammar grows to
-encompass shocks, steady_state_model, etc.
+model block (equations with optional tags), the initval / initial_guess
+blocks, and the shocks block (with multi-revelation path assignments).
+New node types land as the grammar grows to encompass
+steady_state_model, the simulate/steady commands, etc.
 """
 
 from __future__ import annotations
@@ -176,6 +177,45 @@ class InitialGuessBlock:
 
 
 # ---------------------------------------------------------------------------
+# Shocks
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class PathAssignment:
+    """A single ``path = …;`` or ``path at t=…  = …;`` line.
+
+    ``reveal_time`` is the expression after ``t=``, or ``None`` for the
+    default form (implicitly t=0). ``path`` is the expected-path
+    expression.
+    """
+
+    reveal_time: Expr | None
+    path: Expr
+    pos: SourcePos | None = None
+
+
+@dataclass
+class ShockEntry:
+    """One ``var <name>;`` followed by its path assignments.
+
+    The IR validates that ``name`` corresponds to a declared ``varexo``
+    and enforces the design's "no mixing of bare ``path = …`` with
+    explicit ``path at t=0 = …`` for the same shock" rule.
+    """
+
+    name: Identifier
+    paths: list[PathAssignment] = field(default_factory=list)
+    pos: SourcePos | None = None
+
+
+@dataclass
+class ShocksBlock:
+    entries: list[ShockEntry] = field(default_factory=list)
+    pos: SourcePos | None = None
+
+
+# ---------------------------------------------------------------------------
 # Declarations and statements
 # ---------------------------------------------------------------------------
 
@@ -207,7 +247,8 @@ class ParameterValue:
 
 
 # Discriminated union of top-level statements. Will gain members
-# (ShocksBlock, SteadyStateModelBlock, …) as the grammar grows.
+# (SteadyStateModelBlock, simulate/steady commands, …) as the grammar
+# grows.
 Statement = (
     VarDecl
     | VarexoDecl
@@ -216,6 +257,7 @@ Statement = (
     | ModelBlock
     | InitvalBlock
     | InitialGuessBlock
+    | ShocksBlock
 )
 
 
