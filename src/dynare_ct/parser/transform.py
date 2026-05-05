@@ -5,6 +5,7 @@ from __future__ import annotations
 from lark import Token, Transformer, v_args
 
 from dynare_ct.parser.ast import (
+    Assignment,
     BinaryOp,
     DictEntry,
     DictLiteral,
@@ -12,6 +13,8 @@ from dynare_ct.parser.ast import (
     Expr,
     FunctionCall,
     Identifier,
+    InitialGuessBlock,
+    InitvalBlock,
     KeywordArg,
     ModelBlock,
     ModelFile,
@@ -103,6 +106,33 @@ class ASTBuilder(Transformer):
 
     def tag(self, name_token: Token, value_token: Token) -> tuple[str, str]:
         return (name_token.value, _strip_quotes(value_token.value))
+
+    # --- initval and initial_guess -------------------------------------
+
+    def initval_plain(self, *assignments: Assignment) -> InitvalBlock:
+        return InitvalBlock(steady=False, kwargs=[], assignments=list(assignments))
+
+    def initval_steady(self, *assignments: Assignment) -> InitvalBlock:
+        return InitvalBlock(steady=True, kwargs=[], assignments=list(assignments))
+
+    def initval_steady_kwargs(self, *items: KeywordArg | Assignment) -> InitvalBlock:
+        # Children come through in source order: kwargs first (from the
+        # qualifier), then any number of assignments. Splitting by type
+        # is robust to grammar refactors.
+        kwargs: list[KeywordArg] = []
+        assignments: list[Assignment] = []
+        for item in items:
+            if isinstance(item, KeywordArg):
+                kwargs.append(item)
+            else:
+                assignments.append(item)
+        return InitvalBlock(steady=True, kwargs=kwargs, assignments=assignments)
+
+    def initial_guess_block(self, *assignments: Assignment) -> InitialGuessBlock:
+        return InitialGuessBlock(assignments=list(assignments))
+
+    def assignment(self, lhs: Expr, rhs: Expr) -> Assignment:
+        return Assignment(lhs=lhs, rhs=rhs)
 
     # --- expressions: atoms --------------------------------------------
 

@@ -18,6 +18,8 @@
 // Statements:
 //   - parameter-value assignments: name = expr;
 //   - model block: model; <equation>* end;
+//   - initval block: initval [(steady [, kwarg, ...])]; <assignment>* end;
+//   - initial_guess block: initial_guess; <assignment>* end;
 //
 // Equations (inside the model block):
 //   - explicit:        [tags?] LHS = RHS ;
@@ -45,6 +47,8 @@ start: statement+
           | parameters_decl
           | param_value
           | model_block
+          | initval_block
+          | initial_guess_block
 
 // --- declarations -----------------------------------------------------------
 
@@ -74,6 +78,16 @@ equation_body: expr "=" expr  -> equation_eq
 tags: "[" tag ("," tag)* "]"
 
 tag: IDENT "=" STRING
+
+// --- initval and initial_guess blocks --------------------------------------
+
+initval_block: "initval" ";" assignment* "end" ";"                                              -> initval_plain
+             | "initval" "(" "steady" ")" ";" assignment* "end" ";"                             -> initval_steady
+             | "initval" "(" "steady" "," kwarg ("," kwarg)* ")" ";" assignment* "end" ";"      -> initval_steady_kwargs
+
+initial_guess_block: "initial_guess" ";" assignment* "end" ";"
+
+assignment: expr "=" expr ";"
 
 // --- expressions ------------------------------------------------------------
 
