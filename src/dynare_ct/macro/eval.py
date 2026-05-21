@@ -169,6 +169,10 @@ def tokenize(text: str) -> list[_Token]:
 #   ("array", [node, ...])    ("call", name, [node, ...])
 #   ("index", target, index)  ("unary", op, node)
 #   ("bin", op, left, right)  ("range", lo, hi)
+#   ("tuple", [node, ...])    ("comp", expr_node, [clause, ...])
+# where a comprehension clause is ("for", target, iter_node) or
+# ("if", cond_node), and a target is ("var_target", name) or
+# ("tuple_target", (name, ...)).
 # ---------------------------------------------------------------------------
 
 _BOOLEANS = {"true": True, "false": False, "TRUE": True, "FALSE": False}
@@ -294,15 +298,9 @@ class _Parser:
                 return ("call", tok.value, args)
             return ("var", tok.value)
         if tok.kind == "op" and tok.value == "[":
-            self._advance()
-            items = self._arg_list()
-            self._expect_op("]")
-            return ("array", items)
+            return self._array_or_comp()
         if tok.kind == "op" and tok.value == "(":
-            self._advance()
-            node = self._or()
-            self._expect_op(")")
-            return node
+            return self._paren_or_tuple()
         raise MacroError(f"unexpected {tok.value!r} in expression")
 
     def _arg_list(self) -> list[tuple]:
@@ -315,6 +313,73 @@ class _Parser:
             items.append(self._or())
         return items
 
+    def _array_or_comp(self) -> tuple:
+        self._advance()  # consume '['
+        if self._is_op("]"):
+            self._advance()
+            return ("array", [])
+        first = self._or()
+        if self._is_kw("for"):
+            clauses = self._comp_clauses()
+            self._expect_op("]")
+            return ("comp", first, clauses)
+        items = [first]
+        while self._is_op(","):
+            self._advance()
+            if self._is_op("]"):  # tolerate a trailing comma
+                break
+            items.append(self._or())
+        self._expect_op("]")
+        return ("array", items)
+
+    def _paren_or_tuple(self) -> tuple:
+        self._advance()  # consume '('
+        first = self._or()
+        if not self._is_op(","):
+            self._expect_op(")")
+            return first  # plain grouping, not a tuple
+        items = [first]
+        while self._is_op(","):
+            self._advance()
+            if self._is_op(")"):  # trailing comma, e.g. (x,)
+                break
+            items.append(self._or())
+        self._expect_op(")")
+        return ("tuple", items)
+
+    def _comp_clauses(self) -> list[tuple]:
+        clauses: list[tuple] = []
+        while self._is_kw("for") or self._is_kw("if"):
+            if self._is_kw("for"):
+                self._advance()
+                target = self._comp_target()
+                if not self._is_kw("in"):
+                    raise MacroError("expected 'in' in comprehension")
+                self._advance()
+                clauses.append(("for", target, self._or()))
+            else:  # filter
+                self._advance()
+                clauses.append(("if", self._or()))
+        return clauses
+
+    def _comp_target(self) -> tuple:
+        if self._is_op("("):
+            self._advance()
+            names = [self._ident_name()]
+            while self._is_op(","):
+                self._advance()
+                names.append(self._ident_name())
+            self._expect_op(")")
+            return ("tuple_target", tuple(names))
+        return ("var_target", self._ident_name())
+
+    def _ident_name(self) -> str:
+        tok = self._peek()
+        if tok is None or tok.kind != "ident":
+            raise MacroError("expected a name in comprehension target")
+        self._advance()
+        return tok.value
+
 
 # ---------------------------------------------------------------------------
 # Evaluator
@@ -322,8 +387,8 @@ class _Parser:
 
 
 def _length(args: list) -> int:
-    if len(args) != 1 or not isinstance(args[0], (list, str)):
-        raise MacroError("length() expects a single list or string argument")
+    if len(args) != 1 or not isinstance(args[0], (list, tuple, str)):
+        raise MacroError("length() expects a single list, tuple or string argument")
     return len(args[0])
 
 
@@ -499,6 +564,8 @@ def value_to_text(value: Any) -> str:
         return str(value)
     if isinstance(value, list):
         return ", ".join(value_to_text(v) for v in value)
+    if isinstance(value, tuple):
+        return "(" + ", ".join(value_to_text(v) for v in value) + ")"
     raise MacroError(f"cannot render value of type {_typename(value)}")
 
 
@@ -526,6 +593,10 @@ def _eval(node: tuple, env: Mapping[str, Any]) -> Any:
         return env[name]
     if tag == "array":
         return [_eval(item, env) for item in node[1]]
+    if tag == "tuple":
+        return tuple(_eval(item, env) for item in node[1])
+    if tag == "comp":
+        return _eval_comp(node[1], node[2], env)
     if tag == "call":
         name, arg_nodes = node[1], node[2]
         args = [_eval(a, env) for a in arg_nodes]
@@ -560,6 +631,45 @@ def _call_function(name: str, func: MacroFunction, args: list, env: Mapping[str,
     return _eval(func.body, local)
 
 
+def _eval_comp(expr_node: tuple, clauses: list, env: Mapping[str, Any]) -> list:
+    """Evaluate a list comprehension into a list, clause by clause."""
+    results: list = []
+
+    def walk(i: int, scope: dict) -> None:
+        if i == len(clauses):
+            results.append(_eval(expr_node, scope))
+            return
+        clause = clauses[i]
+        if clause[0] == "for":
+            _, target, iter_node = clause
+            seq = _eval(iter_node, scope)
+            if not isinstance(seq, (list, tuple, str)):
+                raise MacroError(
+                    f"comprehension can only iterate over a list, tuple or "
+                    f"string, got {_typename(seq)}"
+                )
+            for item in seq:
+                inner = dict(scope)
+                _bind_target(target, item, inner)
+                walk(i + 1, inner)
+        elif is_truthy(_eval(clause[1], scope)):  # ("if", cond)
+            walk(i + 1, scope)
+
+    walk(0, dict(env))
+    return results
+
+
+def _bind_target(target: tuple, item: Any, scope: dict) -> None:
+    if target[0] == "var_target":
+        scope[target[1]] = item
+        return
+    names = target[1]  # tuple_target
+    if not isinstance(item, (list, tuple)) or len(item) != len(names):
+        raise MacroError(f"cannot unpack {_typename(item)} into {len(names)} names")
+    for name, value in zip(names, item, strict=True):
+        scope[name] = value
+
+
 def _unary(op: str, value: Any) -> Any:
     if op == "-":
         if isinstance(value, bool) or not isinstance(value, (int, float)):
@@ -570,7 +680,7 @@ def _unary(op: str, value: Any) -> Any:
 
 
 def _index(target: Any, index: Any) -> Any:
-    if not isinstance(target, (list, str)):
+    if not isinstance(target, (list, tuple, str)):
         raise MacroError(f"cannot index into {_typename(target)}")
     if isinstance(index, bool) or not isinstance(index, int):
         raise MacroError("index must be an integer")
@@ -594,9 +704,9 @@ def _binary(op: str, left_node: tuple, right_node: tuple, env: Mapping[str, Any]
     if op == "!=":
         return left != right
     if op == "in":
-        if not isinstance(right, (list, str)):
+        if not isinstance(right, (list, tuple, str)):
             raise MacroError(
-                f"right operand of 'in' must be a list or string, got {_typename(right)}"
+                f"right operand of 'in' must be a list, tuple or string, got {_typename(right)}"
             )
         return left in right
     if op in ("<", "<=", ">", ">="):
@@ -666,6 +776,8 @@ def _typename(value: Any) -> str:
         return "string"
     if isinstance(value, list):
         return "array"
+    if isinstance(value, tuple):
+        return "tuple"
     if isinstance(value, MacroFunction):
         return "function"
     return type(value).__name__

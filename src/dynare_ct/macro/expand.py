@@ -31,7 +31,8 @@ from dynare_ct.macro.linemap import Frame, LineMap, Origin
 __all__ = ["expand", "expand_string", "MacroError"]
 
 _IDENT_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
-_FOR_RE = re.compile(r"([A-Za-z_][A-Za-z0-9_]*)\s+in\s+(.+)", re.DOTALL)
+# @#for target: a single name or a parenthesised name list, then `in EXPR`.
+_FOR_RE = re.compile(r"(\([^)]*\)|[A-Za-z_][A-Za-z0-9_]*)\s+in\s+(.+)", re.DOTALL)
 # Function-define left-hand side: NAME(param, param, ...).
 _FUNC_LHS_RE = re.compile(r"([A-Za-z_][A-Za-z0-9_]*)\s*\(([^)]*)\)")
 
@@ -86,7 +87,10 @@ class _If:
 
 @dataclass(frozen=True)
 class _For:
-    var: str
+    # target is ("var", name) or ("tuple", (name, ...)); target_src is the
+    # original text, kept for the line-map frame message.
+    target: tuple
+    target_src: str
     iter_expr: str
     body: list
     lineno: int
@@ -199,12 +203,26 @@ class _BlockParser:
     def _for(self, d: Directive) -> _For:
         m = _FOR_RE.fullmatch(d.args.strip())
         if m is None:
-            self._fail("malformed @#for; expected '@#for VAR in EXPRESSION'", d)
+            self._fail(
+                "malformed @#for; expected '@#for VAR in EXPRESSION' "
+                "or '@#for (VAR, ...) in EXPRESSION'",
+                d,
+            )
+        target_src = m.group(1).strip()
+        target = self._for_target(target_src, d)
         body, term = self._body(("endfor", "endif", "else", "elseif"))
         if term is None or term.keyword != "endfor":
             self._fail("unterminated @#for (missing @#endfor)", d)
         self._i += 1  # consume @#endfor
-        return _For(m.group(1), m.group(2).strip(), body, d.lineno)
+        return _For(target, target_src, m.group(2).strip(), body, d.lineno)
+
+    def _for_target(self, src: str, d: Directive) -> tuple:
+        if src.startswith("("):
+            names = self._params(src[1:-1], d)
+            if not names:
+                self._fail("@#for tuple target needs at least one name", d)
+            return ("tuple", names)
+        return ("var", src)
 
     def _fail(self, message: str, d: Directive):
         raise MacroError(message, file=self._file, line=d.lineno)
@@ -261,11 +279,25 @@ class _Expander:
         items = self._eval(node.iter_expr, ctx, node.lineno)
         if not isinstance(items, list):
             raise MacroError("@#for can only iterate over a list", file=ctx.file, line=node.lineno)
-        directive = f"@#for {node.var} in {node.iter_expr}"
+        directive = f"@#for {node.target_src} in {node.iter_expr}"
         for item in items:
-            ctx.env[node.var] = item
+            self._bind_for(node.target, item, ctx, node.lineno)
             frame = Frame(directive, f"iteration {value_to_text(item)}")
             self._run(node.body, replace(ctx, context=ctx.context + (frame,)))
+
+    def _bind_for(self, target: tuple, item: object, ctx: _Ctx, lineno: int) -> None:
+        if target[0] == "var":
+            ctx.env[target[1]] = item
+            return
+        names = target[1]  # tuple target
+        if not isinstance(item, (list, tuple)) or len(item) != len(names):
+            raise MacroError(
+                f"@#for cannot unpack a value into {len(names)} loop variables",
+                file=ctx.file,
+                line=lineno,
+            )
+        for name, value in zip(names, item, strict=True):
+            ctx.env[name] = value
 
     def _make_function(self, node: _DefineFunc, ctx: _Ctx) -> MacroFunction:
         try:
