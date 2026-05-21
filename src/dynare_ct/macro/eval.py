@@ -31,6 +31,7 @@ inclusive integer range.
 
 from __future__ import annotations
 
+import math
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -336,7 +337,147 @@ def _range(args: list) -> list[int]:
     return list(range(lo, hi + (1 if step > 0 else -1), step))
 
 
-_BUILTINS = {"length": _length, "range": _range}
+# --- real-math library ----------------------------------------------------
+#
+# Functions that produce a real always return a float; the rounding family
+# (floor/ceil/round/trunc/sign) returns an integer, and abs/min/max/mod/power
+# preserve the integer-ness of their operands so results stay usable as
+# indices and loop bounds.
+
+
+def _expect_numeric(name: str, args: list, n: int | None = None) -> list:
+    if n is not None and len(args) != n:
+        raise MacroError(f"{name}() expects {n} argument(s), got {len(args)}")
+    for a in args:
+        if not _is_number(a):
+            raise MacroError(f"{name}() expects numeric argument(s)")
+    return args
+
+
+def _unary_math(name: str, fn):
+    """Wrap a one-argument math function, mapping domain errors to MacroError."""
+
+    def builtin(args: list):
+        (x,) = _expect_numeric(name, args, 1)
+        try:
+            return fn(float(x))
+        except (ValueError, OverflowError) as exc:
+            raise MacroError(f"{name}(): {exc}") from None
+
+    return builtin
+
+
+def _abs(args: list):
+    (x,) = _expect_numeric("abs", args, 1)
+    return abs(x)
+
+
+def _sign(args: list) -> int:
+    (x,) = _expect_numeric("sign", args, 1)
+    return (x > 0) - (x < 0)
+
+
+def _floor(args: list) -> int:
+    (x,) = _expect_numeric("floor", args, 1)
+    return math.floor(x)
+
+
+def _ceil(args: list) -> int:
+    (x,) = _expect_numeric("ceil", args, 1)
+    return math.ceil(x)
+
+
+def _trunc(args: list) -> int:
+    (x,) = _expect_numeric("trunc", args, 1)
+    return math.trunc(x)
+
+
+def _round(args: list) -> int:
+    # Round half away from zero (as in Dynare/MATLAB), not banker's rounding.
+    (x,) = _expect_numeric("round", args, 1)
+    return math.floor(x + 0.5) if x >= 0 else math.ceil(x - 0.5)
+
+
+def _mod(args: list):
+    a, b = _expect_numeric("mod", args, 2)
+    if b == 0:
+        raise MacroError("mod() by zero")
+    return a - b * math.floor(a / b)  # divisor sign, like MATLAB mod
+
+
+def _power(args: list):
+    a, b = _expect_numeric("power", args, 2)
+    return _arith("^", a, b)
+
+
+def _minmax(name: str, fn):
+    def builtin(args: list):
+        items = args[0] if len(args) == 1 and isinstance(args[0], list) else args
+        if not items:
+            raise MacroError(f"{name}() of an empty sequence")
+        for a in items:
+            if not _is_number(a):
+                raise MacroError(f"{name}() expects numeric argument(s)")
+        return fn(items)
+
+    return builtin
+
+
+def _norm_args(name: str, args: list) -> tuple[float, float, float]:
+    if len(args) not in (1, 3):
+        raise MacroError(f"{name}() expects 1 or 3 arguments")
+    _expect_numeric(name, args)
+    mu, sigma = (args[1], args[2]) if len(args) == 3 else (0.0, 1.0)
+    if sigma <= 0:
+        raise MacroError(f"{name}(): sigma must be positive")
+    return args[0], mu, sigma
+
+
+def _normpdf(args: list) -> float:
+    x, mu, sigma = _norm_args("normpdf", args)
+    z = (x - mu) / sigma
+    return math.exp(-0.5 * z * z) / (sigma * math.sqrt(2 * math.pi))
+
+
+def _normcdf(args: list) -> float:
+    x, mu, sigma = _norm_args("normcdf", args)
+    return 0.5 * (1.0 + math.erf((x - mu) / (sigma * math.sqrt(2.0))))
+
+
+# One-argument functions that map directly onto the math module.
+_REAL_UNARY = {
+    "exp": math.exp,
+    "ln": math.log,
+    "log": math.log,
+    "log10": math.log10,
+    "sqrt": math.sqrt,
+    "sin": math.sin,
+    "cos": math.cos,
+    "tan": math.tan,
+    "asin": math.asin,
+    "acos": math.acos,
+    "atan": math.atan,
+    "erf": math.erf,
+    "erfc": math.erfc,
+}
+
+_BUILTINS = {
+    "length": _length,
+    "range": _range,
+    "abs": _abs,
+    "sign": _sign,
+    "floor": _floor,
+    "ceil": _ceil,
+    "trunc": _trunc,
+    "round": _round,
+    "mod": _mod,
+    "power": _power,
+    "min": _minmax("min", min),
+    "max": _minmax("max", max),
+    "normpdf": _normpdf,
+    "normcdf": _normcdf,
+    **{name: _unary_math(name, fn) for name, fn in _REAL_UNARY.items()},
+}
 
 
 def is_truthy(value: Any) -> bool:
