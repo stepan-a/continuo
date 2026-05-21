@@ -33,9 +33,17 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping
+from dataclasses import dataclass
 from typing import Any
 
-__all__ = ["MacroError", "evaluate", "is_truthy", "value_to_text"]
+__all__ = [
+    "MacroError",
+    "MacroFunction",
+    "evaluate",
+    "is_truthy",
+    "parse_expression",
+    "value_to_text",
+]
 
 
 class MacroError(Exception):
@@ -57,6 +65,19 @@ class MacroError(Exception):
         if self.line is not None:
             return f"line {self.line}: {self.message}"
         return self.message
+
+
+@dataclass(frozen=True)
+class MacroFunction:
+    """A user-defined function macro: ``@#define f(params) = body``.
+
+    ``body`` is the pre-parsed expression AST. Free variables in the body
+    resolve against the environment at *call* time, so a function may
+    reference macro variables defined after it.
+    """
+
+    params: tuple[str, ...]
+    body: tuple
 
 
 # ---------------------------------------------------------------------------
@@ -340,9 +361,17 @@ def value_to_text(value: Any) -> str:
     raise MacroError(f"cannot render value of type {_typename(value)}")
 
 
+def parse_expression(text: str) -> tuple:
+    """Parse a macro expression into its internal AST without evaluating.
+
+    Used to capture a function-macro body once at definition time.
+    """
+    return _Parser(tokenize(text)).parse()
+
+
 def evaluate(text: str, env: Mapping[str, Any]) -> Any:
     """Parse and evaluate a macro expression against ``env``."""
-    return _eval(_Parser(tokenize(text)).parse(), env)
+    return _eval(parse_expression(text), env)
 
 
 def _eval(node: tuple, env: Mapping[str, Any]) -> Any:
@@ -358,9 +387,15 @@ def _eval(node: tuple, env: Mapping[str, Any]) -> Any:
         return [_eval(item, env) for item in node[1]]
     if tag == "call":
         name, arg_nodes = node[1], node[2]
-        if name not in _BUILTINS:
-            raise MacroError(f"unknown macro function {name!r}")
-        return _BUILTINS[name]([_eval(a, env) for a in arg_nodes])
+        args = [_eval(a, env) for a in arg_nodes]
+        func = env.get(name)
+        if isinstance(func, MacroFunction):
+            return _call_function(name, func, args, env)
+        if name in env:
+            raise MacroError(f"{name!r} is not a macro function")
+        if name in _BUILTINS:
+            return _BUILTINS[name](args)
+        raise MacroError(f"unknown macro function {name!r}")
     if tag == "index":
         return _index(_eval(node[1], env), _eval(node[2], env))
     if tag == "unary":
@@ -370,6 +405,18 @@ def _eval(node: tuple, env: Mapping[str, Any]) -> Any:
     if tag == "bin":
         return _binary(node[1], node[2], node[3], env)
     raise MacroError(f"internal: unknown node {tag!r}")  # pragma: no cover
+
+
+def _call_function(name: str, func: MacroFunction, args: list, env: Mapping[str, Any]) -> Any:
+    if len(args) != len(func.params):
+        raise MacroError(
+            f"macro function {name!r} expects {len(func.params)} argument(s), got {len(args)}"
+        )
+    # Parameters shadow the call-time environment; free variables fall
+    # through to it (late binding).
+    local = dict(env)
+    local.update(zip(func.params, args, strict=True))
+    return _eval(func.body, local)
 
 
 def _unary(op: str, value: Any) -> Any:
@@ -478,4 +525,6 @@ def _typename(value: Any) -> str:
         return "string"
     if isinstance(value, list):
         return "array"
+    if isinstance(value, MacroFunction):
+        return "function"
     return type(value).__name__

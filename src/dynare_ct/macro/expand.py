@@ -17,7 +17,14 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
-from dynare_ct.macro.eval import MacroError, evaluate, is_truthy, value_to_text
+from dynare_ct.macro.eval import (
+    MacroError,
+    MacroFunction,
+    evaluate,
+    is_truthy,
+    parse_expression,
+    value_to_text,
+)
 from dynare_ct.macro.lex import Directive, TextLine, lex
 from dynare_ct.macro.linemap import Frame, LineMap, Origin
 
@@ -25,6 +32,13 @@ __all__ = ["expand", "expand_string", "MacroError"]
 
 _IDENT_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 _FOR_RE = re.compile(r"([A-Za-z_][A-Za-z0-9_]*)\s+in\s+(.+)", re.DOTALL)
+# Function-define left-hand side: NAME(param, param, ...).
+_FUNC_LHS_RE = re.compile(r"([A-Za-z_][A-Za-z0-9_]*)\s*\(([^)]*)\)")
+
+_DEFINE_HELP = (
+    "malformed @#define; expected '@#define NAME = EXPRESSION' "
+    "or '@#define NAME(args) = EXPRESSION'"
+)
 
 # Directive keywords that terminate a block body (consumed by the opener).
 _TERMINATORS = ("elseif", "else", "endif", "endfor")
@@ -45,6 +59,14 @@ class _Text:
 class _Define:
     name: str
     expr: str
+    lineno: int
+
+
+@dataclass(frozen=True)
+class _DefineFunc:
+    name: str
+    params: tuple[str, ...]
+    body: str
     lineno: int
 
 
@@ -115,12 +137,29 @@ class _BlockParser:
             self._fail(f"@#{kw} without a matching opener", d)
         self._fail(f"unsupported directive @#{kw}", d)
 
-    def _define(self, d: Directive) -> _Define:
-        name, sep, expr = d.args.partition("=")
-        name = name.strip()
-        if not sep or not _IDENT_RE.fullmatch(name) or not expr.strip():
-            self._fail("malformed @#define; expected '@#define NAME = EXPRESSION'", d)
-        return _Define(name, expr.strip(), d.lineno)
+    def _define(self, d: Directive):
+        lhs, sep, body = d.args.partition("=")
+        lhs, body = lhs.strip(), body.strip()
+        if not sep or not body:
+            self._fail(_DEFINE_HELP, d)
+        func = _FUNC_LHS_RE.fullmatch(lhs)
+        if func is not None:
+            return _DefineFunc(func.group(1), self._params(func.group(2), d), body, d.lineno)
+        if not _IDENT_RE.fullmatch(lhs):
+            self._fail(_DEFINE_HELP, d)
+        return _Define(lhs, body, d.lineno)
+
+    def _params(self, raw: str, d: Directive) -> tuple[str, ...]:
+        raw = raw.strip()
+        if not raw:
+            return ()
+        names = [p.strip() for p in raw.split(",")]
+        for name in names:
+            if not _IDENT_RE.fullmatch(name):
+                self._fail(f"invalid parameter name {name!r} in @#define", d)
+        if len(set(names)) != len(names):
+            self._fail("duplicate parameter name in @#define", d)
+        return tuple(names)
 
     def _if(self, d: Directive) -> _If:
         branches: list[tuple[tuple[str, str] | None, list]] = []
@@ -206,6 +245,8 @@ class _Expander:
                 self._emit(self._subst(node.text, ctx, node.lineno), ctx, node.lineno)
             elif isinstance(node, _Define):
                 ctx.env[node.name] = self._eval(node.expr, ctx, node.lineno)
+            elif isinstance(node, _DefineFunc):
+                ctx.env[node.name] = self._make_function(node, ctx)
             elif isinstance(node, _If):
                 for cond, branch in node.branches:
                     if self._cond_true(cond, ctx, node.lineno):
@@ -225,6 +266,15 @@ class _Expander:
             ctx.env[node.var] = item
             frame = Frame(directive, f"iteration {value_to_text(item)}")
             self._run(node.body, replace(ctx, context=ctx.context + (frame,)))
+
+    def _make_function(self, node: _DefineFunc, ctx: _Ctx) -> MacroFunction:
+        try:
+            body = parse_expression(node.body)
+        except MacroError as e:
+            if e.file is None:
+                raise MacroError(e.message, file=ctx.file, line=node.lineno) from None
+            raise
+        return MacroFunction(node.params, body)
 
     def _include(self, node: _Include, ctx: _Ctx) -> None:
         raw = self._subst(node.arg, ctx, node.lineno).strip()
