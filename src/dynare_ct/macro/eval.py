@@ -771,6 +771,19 @@ def _unary(op: str, value: Any) -> Any:
 def _index(target: Any, index: Any) -> Any:
     if not isinstance(target, (list, tuple, str)):
         raise MacroError(f"cannot index into {_typename(target)}")
+    if isinstance(index, list):
+        # Gather/slice: a[1:3] indexes with the range list [1, 2, 3]. The
+        # result keeps the container kind (string slices stay strings).
+        items = [_index_one(target, i) for i in index]
+        if isinstance(target, str):
+            return "".join(items)
+        if isinstance(target, tuple):
+            return tuple(items)
+        return items
+    return _index_one(target, index)
+
+
+def _index_one(target: Any, index: Any) -> Any:
     if isinstance(index, bool) or not isinstance(index, int):
         raise MacroError("index must be an integer")
     if not 1 <= index <= len(target):
@@ -821,6 +834,9 @@ def _arith(op: str, left: Any, right: Any) -> Any:
             return left + right
         if isinstance(left, list) and isinstance(right, list):
             return left + right
+    if op == "-" and isinstance(left, list) and isinstance(right, list):
+        # Array set-difference: drop every element of `left` found in `right`.
+        return [x for x in left if x not in right]
     if not (_is_number(left) and _is_number(right)):
         raise MacroError(
             f"operator {op!r} not defined for {_typename(left)} and {_typename(right)}"

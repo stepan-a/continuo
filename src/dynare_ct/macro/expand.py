@@ -13,6 +13,7 @@ receive plain text plus the line map for error reporting.
 from __future__ import annotations
 
 import re
+import sys
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
@@ -78,6 +79,24 @@ class _Include:
 
 
 @dataclass(frozen=True)
+class _IncludePath:
+    arg: str
+    lineno: int
+
+
+@dataclass(frozen=True)
+class _Echo:
+    expr: str
+    is_error: bool  # @#error aborts; @#echo only prints
+    lineno: int
+
+
+@dataclass(frozen=True)
+class _EchoVars:
+    lineno: int
+
+
+@dataclass(frozen=True)
 class _If:
     # Each branch is (condition, body); condition is None for @#else,
     # ("expr", text) for @#if/@#elseif, or ("ifdef"|"ifndef", name).
@@ -135,6 +154,16 @@ class _BlockParser:
             return self._if(d)
         if kw == "for":
             return self._for(d)
+        if kw == "includepath":
+            if not d.args:
+                self._fail("@#includepath requires a path", d)
+            return _IncludePath(d.args, d.lineno)
+        if kw in ("echo", "error"):
+            if not d.args:
+                self._fail(f"@#{kw} requires a message expression", d)
+            return _Echo(d.args, kw == "error", d.lineno)
+        if kw == "echomacrovars":
+            return _EchoVars(d.lineno)
         if kw == "":
             self._fail("missing directive keyword after '@#'", d)
         if kw in _TERMINATORS:
@@ -253,6 +282,7 @@ class _Expander:
         self.out: list[str] = []
         self.linemap = LineMap()
         self.include_stack: list[Path] = []
+        self.search_paths: list[Path] = []  # extra dirs from @#includepath
 
     def run(self, text: str, ctx: _Ctx) -> None:
         self._run(_BlockParser(lex(text), ctx.file).parse(), ctx)
@@ -274,6 +304,21 @@ class _Expander:
                 self._run_for(node, ctx)
             elif isinstance(node, _Include):
                 self._include(node, ctx)
+            elif isinstance(node, _IncludePath):
+                self._includepath(node, ctx)
+            elif isinstance(node, _Echo):
+                self._run_echo(node, ctx)
+            elif isinstance(node, _EchoVars):
+                self._echo(_format_macrovars(ctx.env))
+
+    def _run_echo(self, node: _Echo, ctx: _Ctx) -> None:
+        message = value_to_text(self._eval(node.expr, ctx, node.lineno))
+        if node.is_error:
+            raise MacroError(message, file=ctx.file, line=node.lineno)
+        self._echo(f"{ctx.file}:{node.lineno}: {message}")
+
+    def _echo(self, message: str) -> None:
+        print(message, file=sys.stderr)
 
     def _run_for(self, node: _For, ctx: _Ctx) -> None:
         items = self._eval(node.iter_expr, ctx, node.lineno)
@@ -309,16 +354,15 @@ class _Expander:
         return MacroFunction(node.params, body)
 
     def _include(self, node: _Include, ctx: _Ctx) -> None:
-        raw = self._subst(node.arg, ctx, node.lineno).strip()
-        path_str = raw[1:-1] if len(raw) >= 2 and raw[0] in "\"'" and raw[-1] == raw[0] else raw
-        target = ctx.base_dir / path_str
-        resolved = target.resolve()
-        if resolved in self.include_stack:
-            raise MacroError(f"circular @#include of {path_str!r}", file=ctx.file, line=node.lineno)
-        if not target.is_file():
+        path_str = self._resolve_arg_path(node.arg, ctx, node.lineno)
+        target = self._find_include(path_str, ctx)
+        if target is None:
             raise MacroError(
                 f"@#include file not found: {path_str!r}", file=ctx.file, line=node.lineno
             )
+        resolved = target.resolve()
+        if resolved in self.include_stack:
+            raise MacroError(f"circular @#include of {path_str!r}", file=ctx.file, line=node.lineno)
         frame = Frame("@#include", f"at line {node.lineno} of {Path(ctx.file).name}")
         self.include_stack.append(resolved)
         self.run(
@@ -326,6 +370,24 @@ class _Expander:
             _Ctx(ctx.env, str(target), target.parent, ctx.context + (frame,)),
         )
         self.include_stack.pop()
+
+    def _find_include(self, path_str: str, ctx: _Ctx) -> Path | None:
+        # Search the including file's directory first, then @#includepath dirs.
+        for base in (ctx.base_dir, *self.search_paths):
+            candidate = base / path_str
+            if candidate.is_file():
+                return candidate
+        return None
+
+    def _includepath(self, node: _IncludePath, ctx: _Ctx) -> None:
+        path_str = self._resolve_arg_path(node.arg, ctx, node.lineno)
+        self.search_paths.append((ctx.base_dir / path_str).resolve())
+
+    def _resolve_arg_path(self, arg: str, ctx: _Ctx, lineno: int) -> str:
+        raw = self._subst(arg, ctx, lineno).strip()
+        if len(raw) >= 2 and raw[0] in "\"'" and raw[-1] == raw[0]:
+            return raw[1:-1]
+        return raw
 
     def _emit(self, text: str, ctx: _Ctx, lineno: int) -> None:
         self.out.append(text)
@@ -380,6 +442,19 @@ class _Expander:
                     return i
             i += 1
         raise MacroError("unterminated @{...} expansion", file=ctx.file, line=lineno)
+
+
+def _format_macrovars(env: dict) -> str:
+    """Render the current macro environment for @#echomacrovars."""
+    lines = ["Macro variables:"]
+    for name in sorted(env):
+        value = env[name]
+        if isinstance(value, MacroFunction):
+            rendered = f"<function({', '.join(value.params)})>"
+        else:
+            rendered = value_to_text(value)
+        lines.append(f"  {name} = {rendered}")
+    return "\n".join(lines)
 
 
 # ---------------------------------------------------------------------------
