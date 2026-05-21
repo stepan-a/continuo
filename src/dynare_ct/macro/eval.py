@@ -509,6 +509,74 @@ def _normcdf(args: list) -> float:
     return 0.5 * (1.0 + math.erf((x - mu) / (sigma * math.sqrt(2.0))))
 
 
+# --- type predicates and utility functions --------------------------------
+
+
+def _type_predicate(name: str, test):
+    def builtin(args: list) -> bool:
+        if len(args) != 1:
+            raise MacroError(f"{name}() expects 1 argument, got {len(args)}")
+        return test(args[0])
+
+    return builtin
+
+
+def _isempty(args: list) -> bool:
+    if len(args) != 1 or not isinstance(args[0], (list, tuple, str)):
+        raise MacroError("isempty() expects a list, tuple or string")
+    return len(args[0]) == 0
+
+
+def _sum(args: list):
+    if len(args) != 1 or not isinstance(args[0], (list, tuple)):
+        raise MacroError("sum() expects a list or tuple")
+    total: Any = 0
+    for v in args[0]:
+        if not _is_number(v):
+            raise MacroError("sum() expects numeric elements")
+        total = total + v
+    return total
+
+
+def _string(args: list) -> str:
+    if len(args) != 1:
+        raise MacroError("string() expects 1 argument")
+    return value_to_text(args[0])
+
+
+def _real(args: list) -> float:
+    if len(args) != 1:
+        raise MacroError("real() expects 1 argument")
+    x = args[0]
+    if isinstance(x, bool):
+        raise MacroError("real() does not accept a boolean")
+    if isinstance(x, (int, float)):
+        return float(x)
+    if isinstance(x, str):
+        try:
+            return float(x)
+        except ValueError:
+            raise MacroError(f"real(): cannot convert {x!r} to a real") from None
+    raise MacroError(f"real() does not accept {_typename(x)}")
+
+
+def _bool(args: list) -> bool:
+    if len(args) != 1:
+        raise MacroError("bool() expects 1 argument")
+    x = args[0]
+    if isinstance(x, bool):
+        return x
+    if _is_number(x):
+        return x != 0
+    raise MacroError(f"bool() does not accept {_typename(x)}")
+
+
+def _defined(arg_nodes: list, env: Mapping[str, Any]) -> bool:
+    if len(arg_nodes) != 1 or arg_nodes[0][0] != "var":
+        raise MacroError("defined() expects a single macro variable name")
+    return arg_nodes[0][1] in env
+
+
 # One-argument functions that map directly onto the math module.
 _REAL_UNARY = {
     "exp": math.exp,
@@ -526,6 +594,17 @@ _REAL_UNARY = {
     "erfc": math.erfc,
 }
 
+# isreal follows Dynare: every number is a "real" (integers included);
+# isinteger is the toolbox-specific test for the integer subtype.
+_TYPE_PREDICATES = {
+    "isreal": lambda v: _is_number(v),
+    "isinteger": lambda v: isinstance(v, int) and not isinstance(v, bool),
+    "isstring": lambda v: isinstance(v, str),
+    "isboolean": lambda v: isinstance(v, bool),
+    "isarray": lambda v: isinstance(v, list),
+    "istuple": lambda v: isinstance(v, tuple),
+}
+
 _BUILTINS = {
     "length": _length,
     "range": _range,
@@ -541,7 +620,13 @@ _BUILTINS = {
     "max": _minmax("max", max),
     "normpdf": _normpdf,
     "normcdf": _normcdf,
+    "isempty": _isempty,
+    "sum": _sum,
+    "string": _string,
+    "real": _real,
+    "bool": _bool,
     **{name: _unary_math(name, fn) for name, fn in _REAL_UNARY.items()},
+    **{name: _type_predicate(name, test) for name, test in _TYPE_PREDICATES.items()},
 }
 
 
@@ -599,6 +684,10 @@ def _eval(node: tuple, env: Mapping[str, Any]) -> Any:
         return _eval_comp(node[1], node[2], env)
     if tag == "call":
         name, arg_nodes = node[1], node[2]
+        # `defined` is a special form: its argument is a name, not a value
+        # to evaluate (the name need not exist). A user macro may shadow it.
+        if name == "defined" and name not in env:
+            return _defined(arg_nodes, env)
         args = [_eval(a, env) for a in arg_nodes]
         func = env.get(name)
         if isinstance(func, MacroFunction):
