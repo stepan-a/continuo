@@ -16,6 +16,7 @@ dist/
 .coverage.*
 htmlcov/
 .tox/
+.nox/
 
 # Type checkers / linters
 .mypy_cache/

@@ -7,7 +7,7 @@ name = "dynare-ct"
 version = "0.0.1"
 description = "Continuous-time DSGE toolbox in the spirit of Dynare."
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.13"
 license = { file = "LICENSE" }
 authors = [
     { name = "Stéphane Adjemian", email = "stepan@adjemian.eu" },
@@ -25,9 +25,8 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "License :: Public Domain",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering",
     "Topic :: Scientific/Engineering :: Mathematics",
 ]
@@ -51,6 +50,7 @@ dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
     "ruff>=0.5",
+    "nox>=2024.3",
 ]
 
 [project.scripts]
