@@ -249,41 +249,90 @@ def _to_csc(jacobian: ca.DM) -> csc_matrix:
 def initial_conditions(
     model: Model, theta: dict[str, float], e: dict[str, float], ss: dict[str, float]
 ) -> dict[str, float]:
-    """Evaluate the initval initial states, resolving steady_state(.) via ``ss``."""
+    """Evaluate the initval initial states.
+
+    ``steady_state(v)`` resolves to ``ss`` — the initial steady state at the
+    active exogenous ``e``. ``steady_state(v, e={…})`` resolves to the steady
+    state at ``e`` overridden by the given exogenous values; this anchors the
+    initial state at a *different* steady state than the active one, the case
+    of a change already in effect at ``t = 0``.
+    """
     table = constant_table(theta, e, model)
+    cache: dict[tuple[tuple[str, float], ...], dict[str, float]] = {}
+
+    def steady_at(override: dict[str, float]) -> dict[str, float]:
+        if not override:
+            return ss
+        merged = {**e, **override}
+        key = tuple(sorted(merged.items()))
+        if key not in cache:
+            cache[key] = steady_state(model, exogenous=merged)
+        return cache[key]
+
     result: dict[str, float] = {}
     for state in model.states:
         expr = model.initial_values.get(state)
         if expr is None:
             raise SolveError(f"state {state!r} has no initial value; add an initval block")
-        resolved = _resolve_steady_state(expr, ss)
+        resolved = _resolve_steady_state(expr, steady_at, table, model)
         result[state] = eval_constant(resolved, table, what=f"initial value of {state!r}")
     return result
 
 
-def _resolve_steady_state(expr: Expr, ss: dict[str, float]) -> Expr:
-    """Replace ``steady_state(v)`` calls with the numeric SS value of ``v``."""
+def _resolve_steady_state(
+    expr: Expr,
+    steady_at: Callable[[dict[str, float]], dict[str, float]],
+    table,
+    model: Model,
+) -> Expr:
+    """Replace ``steady_state(v[, e={…}])`` calls with the numeric SS value of ``v``."""
     if isinstance(expr, FunctionCall):
         if expr.name.name == "steady_state" and expr.args and isinstance(expr.args[0], Identifier):
-            return NumberLit(ss[expr.args[0].name])
+            override = _steady_override(expr, table, model)
+            return NumberLit(steady_at(override)[expr.args[0].name])
         return FunctionCall(
             expr.name,
-            [_resolve_steady_state(arg, ss) for arg in expr.args],
+            [_resolve_steady_state(arg, steady_at, table, model) for arg in expr.args],
             list(expr.kwargs),
             expr.pos,
         )
     if isinstance(expr, BinaryOp):
-        left = _resolve_steady_state(expr.left, ss)
-        right = _resolve_steady_state(expr.right, ss)
+        left = _resolve_steady_state(expr.left, steady_at, table, model)
+        right = _resolve_steady_state(expr.right, steady_at, table, model)
         return BinaryOp(expr.op, left, right, expr.pos)
     if isinstance(expr, UnaryOp):
-        return UnaryOp(expr.op, _resolve_steady_state(expr.operand, ss), expr.pos)
+        return UnaryOp(expr.op, _resolve_steady_state(expr.operand, steady_at, table, model), expr.pos)
     if isinstance(expr, DictLiteral):
         return DictLiteral(
-            [DictEntry(e.key, _resolve_steady_state(e.value, ss), e.pos) for e in expr.entries],
+            [
+                DictEntry(en.key, _resolve_steady_state(en.value, steady_at, table, model), en.pos)
+                for en in expr.entries
+            ],
             expr.pos,
         )
     return expr
+
+
+def _steady_override(call: FunctionCall, table, model: Model) -> dict[str, float]:
+    """The exogenous override from a ``steady_state(v, e={…})`` call (``{}`` if none)."""
+    override: dict[str, float] = {}
+    for kw in call.kwargs:
+        if kw.name.name != "e":
+            raise SolveError(
+                f"steady_state(): unsupported argument {kw.name.name!r} (only e={{…}} is allowed here)"
+            )
+        if not isinstance(kw.value, DictLiteral):
+            raise SolveError("steady_state() 'e' override must be a {…} mapping")
+        for entry in kw.value.entries:
+            name = entry.key.name
+            if name not in model.exogenous:
+                raise SolveError(
+                    f"steady_state() e={{…}}: {name!r} is not an exogenous variable"
+                )
+            override[name] = eval_constant(
+                entry.value, table, what=f"steady_state e override for {name!r}"
+            )
+    return override
 
 
 def _vector(values) -> ca.DM:

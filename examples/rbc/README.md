@@ -126,8 +126,15 @@ ss = model.steady_state(exogenous={"e": 0.05})
 
 When a permanent change is already live at `t=0`, the predetermined states must
 be anchored at the *pre-shock* steady state rather than the active one.
-`rbc_sustained.mod` does this by writing the `e=0` steady-state values directly
-in its `initval` block. The dedicated sugar for this — `initval(steady,
-e={e: 0})` — currently parses but is **not yet honoured by the solver** (the
-per-call exogenous override is dropped, and the initial steady state is always
-evaluated at the active exogenous), so the explicit form is used here instead.
+`rbc_sustained.mod` does this with the `initval(steady, e={…})` override:
+
+```
+initval(steady, e={e: 0});   // fill states from the steady state at e = 0
+end;
+```
+
+`initval(steady)` fills every state from the initial steady state; the `e={…}`
+argument evaluates that steady state at the given exogenous values (here `e=0`)
+instead of the active ones (`e=0.05`). The same override is available on the
+per-variable callable, `steady_state(K, e={e: 0})`, for use inside a plain
+`initval` block.

@@ -158,7 +158,53 @@ def test_initval_steady_starts_at_steady_state():
     np.testing.assert_allclose(sol["x"], np.full(11, 2.0), atol=1e-9)
 
 
+# A state x with steady state x* = u, driven by exogenous u. With u = 1 active
+# from t=0, the e={…} override anchors x(0) at the u=0 SS instead. (solve_pf
+# takes the constant exogenous directly; the shocks block is the orchestrator's.)
+ANCHOR = """
+var(state) x;
+var(jump) y;
+varexo u;
+model;
+  diff(x) = u - x;
+  diff(y) = y;
+end;
+steady_state_model;
+  x = u;
+  y = 0;
+end;
+"""
+
+
+def test_initval_steady_e_override_anchors_at_a_different_steady_state():
+    src = ANCHOR + "initval(steady, e={u: 0});\nend;\n"
+    sol = solve_pf(model(src), horizon=20.0, intervals=200, exogenous={"u": 1.0})
+    assert sol["x"][0] == pytest.approx(0.0, abs=1e-9)  # anchored at the u=0 SS
+    assert sol["x"][-1] == pytest.approx(1.0, abs=1e-3)  # to the active u=1 SS
+
+
+def test_explicit_steady_state_e_override():
+    # The same anchor written as an explicit per-state callable.
+    src = ANCHOR + "initval;\n  x = steady_state(x, e={u: 0});\nend;\n"
+    sol = solve_pf(model(src), horizon=20.0, intervals=200, exogenous={"u": 1.0})
+    assert sol["x"][0] == pytest.approx(0.0, abs=1e-9)
+
+
+def test_steady_state_override_default_is_the_active_exogenous():
+    # No override: steady_state(x) is the active SS (x* = u = 1), so the path
+    # is flat at 1.
+    src = ANCHOR + "initval;\n  x = steady_state(x);\nend;\n"
+    sol = solve_pf(model(src), horizon=10.0, intervals=50, exogenous={"u": 1.0})
+    np.testing.assert_allclose(sol["x"], np.full(51, 1.0), atol=1e-6)
+
+
 # --- errors ---------------------------------------------------------------
+
+
+def test_steady_state_override_rejects_non_exogenous_key():
+    src = ANCHOR + "initval(steady, e={a: 0});\nend;\n"
+    with pytest.raises(SolveError, match="not an exogenous variable"):
+        solve_pf(model(src), horizon=5.0, intervals=10, exogenous={"u": 1.0})
 
 
 def test_missing_initval_rejected():

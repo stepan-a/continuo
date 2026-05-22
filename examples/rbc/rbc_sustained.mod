@@ -8,15 +8,13 @@
 //
 // Because the innovation is already live at t = 0, the initial state cannot be
 // read off the active steady state — it must be anchored at the *pre-shock*
-// (e = 0) steady state. We write that anchor explicitly below. (The
-// initval(steady, e={...}) override documented for this case is not yet
-// honoured by the solver — see ../README.md.)
+// (e = 0) steady state. The initval(steady, e={...}) override does exactly
+// that: fill every state from the steady state evaluated at the overridden
+// exogenous (here e = 0) rather than at the active value (e = 0.05).
 
 @#include "common.mod"
 
-initval;
-  K = (alpha * 1 / (rho + delta))^(1 / (1 - alpha));  // e = 0 SS (A = 1)
-  A = 1;                                              // productivity at its mean
+initval(steady, e={e: 0});   // anchor all states at the pre-shock (e = 0) SS
 end;
 
 shocks;

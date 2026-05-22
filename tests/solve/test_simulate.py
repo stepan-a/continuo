@@ -107,6 +107,22 @@ def test_pulse_helper_in_a_shock_path():
     assert x[-1] == pytest.approx(0.0, abs=1e-3)  # decayed back after it ends
 
 
+def test_steady_e_override_anchors_initial_state():
+    # u = 1 is in effect from t=0 (a change already live); the e={…} override
+    # anchors the initial state at the pre-change (u=0) steady state.
+    src = (
+        "var(state) x;\nvar(jump) y;\nvarexo u;\n"
+        "model;\n  diff(x) = u - x;\n  diff(y) = y;\nend;\n"
+        "steady_state_model;\n  x = u;\n  y = 0;\nend;\n"
+        "initval(steady, e={u: 0});\nend;\n"
+        "shocks;\n  var u;\n  path = 1;\nend;\n"
+        "simulate(T=20, N=200);"
+    )
+    sol = simulate(model(src))
+    assert sol["x"][0] == pytest.approx(0.0, abs=1e-9)  # anchored at the u=0 SS
+    assert sol["x"][-1] == pytest.approx(1.0, abs=1e-3)  # to the active u=1 SS
+
+
 # --- surprise (multi-segment) ---------------------------------------------
 
 
