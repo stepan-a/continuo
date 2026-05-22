@@ -29,12 +29,13 @@ import numpy as np
 from dynare_ct.codegen.errors import CodegenError
 from dynare_ct.codegen.residual import build_residual
 from dynare_ct.codegen.translate import SymbolTable, translate
+from dynare_ct.io.solution import Segment, Solution
 from dynare_ct.ir.model import Model
 from dynare_ct.parser.ast import Expr
 from dynare_ct.solve.disc import uniform_grid
 from dynare_ct.solve.errors import SolveError
 from dynare_ct.solve.numeric import constant_table, eval_constant
-from dynare_ct.solve.pf import PFSolution, initial_conditions, solve_segment
+from dynare_ct.solve.pf import initial_conditions, solve_segment
 from dynare_ct.solve.steady import evaluate_parameters, steady_state
 
 __all__ = ["simulate"]
@@ -48,8 +49,8 @@ def simulate(
     horizon: float | None = None,
     intervals: int | None = None,
     scheme: str | None = None,
-) -> PFSolution:
-    """Solve the model's perfect-foresight transition, returning a PFSolution.
+) -> Solution:
+    """Solve the model's perfect-foresight transition, returning a Solution.
 
     ``horizon`` / ``intervals`` / ``scheme`` override the ``simulate``
     command; if both ``horizon`` and ``intervals`` are omitted the command
@@ -66,11 +67,9 @@ def simulate(
     schedule = _schedule(model, theta, dt)
     starts = _segment_starts(schedule, intervals)
 
-    n = len(model.endogenous)
     index = {name: k for k, name in enumerate(model.endogenous)}
-    path = np.empty((intervals + 1, n))
+    segments: list[Segment] = []
     carried: dict[str, float] | None = None
-    total_iterations = 0
 
     for s, start_index in enumerate(starts):
         end_index = starts[s + 1] if s + 1 < len(starts) else intervals + 1
@@ -97,15 +96,28 @@ def simulate(
             terminal_jumps=terminal_jumps,
             guess=guess,
         )
-        total_iterations += iterations
 
         realised = end_index - start_index
-        path[start_index:end_index] = segment_path[:realised]
+        segments.append(
+            Segment(
+                start_time=start_time,
+                times=grid.points[:realised],
+                path=segment_path[:realised],
+                names=model.endogenous,
+                info_set=exogenous_at(start_time),
+                terminal_ss=terminal_ss,
+                iterations=iterations,
+            )
+        )
         if end_index <= intervals:  # carry the state into the next segment
             carried = {name: segment_path[realised, index[name]] for name in model.states}
 
-    times = np.linspace(0.0, horizon, intervals + 1)
-    return PFSolution(times, path, model.endogenous, total_iterations)
+    diagnostics = {
+        "scheme": scheme,
+        "segments": len(segments),
+        "newton_iterations": sum(segment.iterations for segment in segments),
+    }
+    return Solution(tuple(segments), model.endogenous, diagnostics)
 
 
 # ---------------------------------------------------------------------------

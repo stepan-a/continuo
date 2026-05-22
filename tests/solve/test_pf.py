@@ -45,20 +45,20 @@ def test_linear_saddle_matches_cn_discrete_solution():
     dt = 0.5
     ratio = cn_ratio(-1.0, dt)  # diff(x) = -x
     expected_x = np.array([ratio**i for i in range(5)])
-    np.testing.assert_allclose(sol.series("x"), expected_x, atol=1e-9)
-    np.testing.assert_allclose(sol.series("y"), np.zeros(5), atol=1e-9)
+    np.testing.assert_allclose(sol["x"], expected_x, atol=1e-9)
+    np.testing.assert_allclose(sol["y"], np.zeros(5), atol=1e-9)
 
 
 def test_linear_model_converges_in_one_newton_step():
     sol = solve_pf(model(SADDLE), horizon=2.0, intervals=8)
-    assert sol.iterations == 1  # Newton is exact for a linear system
+    assert sol.diagnostics["newton_iterations"] == 1  # Newton is exact for a linear system
 
 
 def test_solution_shape_and_times():
     sol = solve_pf(model(SADDLE), horizon=10.0, intervals=20)
     assert sol.path.shape == (21, 2)
-    assert sol.times[0] == 0.0
-    assert sol.times[-1] == pytest.approx(10.0)
+    assert sol.t[0] == 0.0
+    assert sol.t[-1] == pytest.approx(10.0)
     assert sol.names == ("x", "y")
 
 
@@ -81,7 +81,7 @@ def test_algebraic_variable_tracked_pointwise():
     """
     sol = solve_pf(model(src), horizon=2.0, intervals=4)
     # z = x + y = x everywhere (y is zero).
-    np.testing.assert_allclose(sol.series("z"), sol.series("x"), atol=1e-9)
+    np.testing.assert_allclose(sol["z"], sol["x"], atol=1e-9)
 
 
 # --- boundary conditions --------------------------------------------------
@@ -89,8 +89,8 @@ def test_algebraic_variable_tracked_pointwise():
 
 def test_initial_state_and_terminal_jump_pinned():
     sol = solve_pf(model(SADDLE), horizon=5.0, intervals=10)
-    assert sol.series("x")[0] == pytest.approx(1.0)  # initval
-    assert sol.series("y")[-1] == pytest.approx(0.0, abs=1e-9)  # terminal SS
+    assert sol["x"][0] == pytest.approx(1.0)  # initval
+    assert sol["y"][-1] == pytest.approx(0.0, abs=1e-9)  # terminal SS
 
 
 def test_converges_to_nonzero_steady_state():
@@ -109,8 +109,8 @@ def test_converges_to_nonzero_steady_state():
     end;
     """
     sol = solve_pf(model(src), horizon=20.0, intervals=200)
-    assert sol.series("x")[0] == pytest.approx(0.0)
-    assert sol.series("x")[-1] == pytest.approx(2.0, abs=1e-3)
+    assert sol["x"][0] == pytest.approx(0.0)
+    assert sol["x"][-1] == pytest.approx(2.0, abs=1e-3)
 
 
 # --- exogenous ------------------------------------------------------------
@@ -130,7 +130,7 @@ def test_exogenous_shifts_the_path():
     end;
     """
     sol = solve_pf(model(src), horizon=20.0, intervals=200, exogenous={"u": 3.0})
-    assert sol.series("x")[-1] == pytest.approx(3.0, abs=1e-3)  # x* = u
+    assert sol["x"][-1] == pytest.approx(3.0, abs=1e-3)  # x* = u
 
 
 # --- initval(steady) ------------------------------------------------------
@@ -155,7 +155,7 @@ def test_initval_steady_starts_at_steady_state():
     end;
     """
     sol = solve_pf(model(src), horizon=5.0, intervals=10)
-    np.testing.assert_allclose(sol.series("x"), np.full(11, 2.0), atol=1e-9)
+    np.testing.assert_allclose(sol["x"], np.full(11, 2.0), atol=1e-9)
 
 
 # --- errors ---------------------------------------------------------------

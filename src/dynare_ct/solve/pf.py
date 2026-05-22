@@ -21,7 +21,6 @@ builds on it.
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
 
 import casadi as ca
 import numpy as np
@@ -29,6 +28,7 @@ from scipy.sparse import csc_matrix
 from scipy.sparse.linalg import spsolve
 
 from dynare_ct.codegen.residual import Residual, build_residual
+from dynare_ct.io.solution import Segment, Solution
 from dynare_ct.ir.model import Model
 from dynare_ct.parser.ast import (
     BinaryOp,
@@ -45,33 +45,11 @@ from dynare_ct.solve.errors import SolveError
 from dynare_ct.solve.numeric import constant_table, eval_constant
 from dynare_ct.solve.steady import evaluate_parameters, steady_state
 
-__all__ = ["PFSolution", "solve_pf", "solve_segment", "initial_conditions"]
+__all__ = ["solve_pf", "solve_segment", "initial_conditions"]
 
 _TOL = 1e-10
 _MAX_ITER = 50
 _LINE_SEARCH_STEPS = 30
-
-
-@dataclass
-class PFSolution:
-    """A solved perfect-foresight path.
-
-    ``path`` is shape ``(N+1, n)``; column ``k`` is the variable
-    ``names[k]`` at each grid time in ``times``.
-    """
-
-    times: np.ndarray
-    path: np.ndarray
-    names: tuple[str, ...]
-    iterations: int
-
-    def series(self, name: str) -> np.ndarray:
-        """The path of one variable over the grid."""
-        return self.path[:, self.names.index(name)]
-
-    def terminal(self) -> dict[str, float]:
-        """The endogenous values at the final grid point."""
-        return dict(zip(self.names, self.path[-1].tolist(), strict=True))
 
 
 def solve_pf(
@@ -82,7 +60,7 @@ def solve_pf(
     exogenous: dict[str, float] | None = None,
     tol: float = _TOL,
     max_iter: int = _MAX_ITER,
-) -> PFSolution:
+) -> Solution:
     """Solve a model's perfect-foresight transition over ``[0, horizon]``.
 
     States start from ``initval``; jumps are anchored at the terminal
@@ -113,7 +91,20 @@ def solve_pf(
         tol=tol,
         max_iter=max_iter,
     )
-    return PFSolution(grid.points, path, model.endogenous, iterations)
+    segment = Segment(
+        start_time=0.0,
+        times=grid.points,
+        path=path,
+        names=model.endogenous,
+        info_set=e,
+        terminal_ss=ss,
+        iterations=iterations,
+    )
+    return Solution(
+        segments=(segment,),
+        names=model.endogenous,
+        diagnostics={"scheme": "crank_nicolson", "segments": 1, "newton_iterations": iterations},
+    )
 
 
 def solve_segment(

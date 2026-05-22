@@ -37,7 +37,9 @@ def fix(session):
 @nox.session(python=PYTHON_VERSIONS)
 def tests(session):
     """Install the package with dev extras and run the testsuite."""
-    session.install("-e", ".[dev]")
+    # pandas / xarray are optional extras, installed so the Solution
+    # conversion methods are exercised.
+    session.install("-e", ".[dev,pandas,xarray]")
     session.run("pytest", "-q", "--tb=short", *session.posargs)
 
 

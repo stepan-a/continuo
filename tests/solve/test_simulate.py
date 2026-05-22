@@ -48,13 +48,13 @@ end;
 def test_reads_horizon_and_grid_from_command():
     sol = simulate(model(SADDLE + "simulate(T=10, N=50);"))
     assert sol.path.shape == (51, 2)
-    assert sol.times[-1] == pytest.approx(10.0)
+    assert sol.t[-1] == pytest.approx(10.0)
 
 
 def test_explicit_arguments_override_command():
     sol = simulate(model(SADDLE + "simulate(T=10, N=50);"), horizon=4.0, intervals=8)
     assert sol.path.shape == (9, 2)
-    assert sol.times[-1] == pytest.approx(4.0)
+    assert sol.t[-1] == pytest.approx(4.0)
 
 
 def test_no_command_and_no_arguments_rejected():
@@ -69,15 +69,15 @@ def test_constant_shock_matches_solve_pf():
     src = TRACKER + "shocks;\n  var u;\n  path = 2;\nend;\nsimulate(T=20, N=200);"
     orchestrated = simulate(model(src))
     direct = solve_pf(model(TRACKER), horizon=20.0, intervals=200, exogenous={"u": 2.0})
-    np.testing.assert_allclose(orchestrated.series("x"), direct.series("x"), atol=1e-9)
-    assert orchestrated.series("x")[-1] == pytest.approx(2.0, abs=1e-3)  # x* = u
+    np.testing.assert_allclose(orchestrated["x"], direct["x"], atol=1e-9)
+    assert orchestrated["x"][-1] == pytest.approx(2.0, abs=1e-3)  # x* = u
 
 
 def test_no_shocks_is_autonomous():
     src = SADDLE + "simulate(T=2, N=4);"
     sol = simulate(model(src))
     direct = solve_pf(model(src), horizon=2.0, intervals=4)
-    np.testing.assert_allclose(sol.series("x"), direct.series("x"), atol=1e-12)
+    np.testing.assert_allclose(sol["x"], direct["x"], atol=1e-12)
 
 
 # --- time-varying (anticipated step) shock --------------------------------
@@ -87,12 +87,12 @@ def test_anticipated_step_shock():
     # u steps from 0 to 1 at t=5; x tracks it. Terminal SS uses e(T)=1.
     src = TRACKER + "shocks;\n  var u;\n  path = if(t >= 5, 1, 0);\nend;\nsimulate(T=20, N=200);"
     sol = simulate(model(src))
-    x = sol.series("x")
+    x = sol["x"]
     assert x[0] == pytest.approx(0.0)  # initval
     assert x[-1] == pytest.approx(1.0, abs=1e-3)  # x* = u(T) = 1
     # Before the step the forcing is zero, so x stays near 0; after, it rises.
-    before = sol.times <= 4.0
-    after = sol.times >= 10.0
+    before = sol.t <= 4.0
+    after = sol.t >= 10.0
     assert np.all(x[before] < 0.05)
     assert np.all(x[after] > 0.6)
 
@@ -108,7 +108,7 @@ SURPRISE = (
 
 
 def test_mit_surprise_shock():
-    x = simulate(model(SURPRISE)).series("x")
+    x = simulate(model(SURPRISE))["x"]
     assert x[0] == pytest.approx(0.0)  # initval
     assert x[-1] == pytest.approx(1.0, abs=1e-3)  # new steady state after the surprise
     assert np.all(np.diff(x) > -1e-9)  # u only rises, so x is non-decreasing
@@ -117,7 +117,7 @@ def test_mit_surprise_shock():
 
 def test_state_is_continuous_across_the_surprise():
     sol = simulate(model(SURPRISE))
-    x = sol.series("x")
+    x = sol["x"]
     reveal = 50  # grid index of t=5 (dt = 0.1)
     # The state does not jump at the surprise; it continues from its level.
     assert x[reveal] == pytest.approx(x[reveal - 1], abs=1e-3)
@@ -131,7 +131,7 @@ def test_multiple_surprises():
         TRACKER + "shocks;\n  var u;\n  path = 0;\n  path at t=5 = 1;\n  path at t=10 = 2;\nend;\n"
         "simulate(T=20, N=200);"
     )
-    x = simulate(model(src)).series("x")
+    x = simulate(model(src))["x"]
     dt = 0.1
     assert x[0] == pytest.approx(0.0)
     assert np.all(x[: int(5 / dt)] < 0.05)  # flat at 0 before the first surprise
