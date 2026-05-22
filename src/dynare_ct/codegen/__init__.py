@@ -15,6 +15,14 @@ Public API so far::
 from __future__ import annotations
 
 from dynare_ct.codegen.errors import CodegenError
+from dynare_ct.codegen.residual import Residual, build_residual
 from dynare_ct.codegen.translate import SymbolTable, build_symbols, translate
 
-__all__ = ["build_symbols", "translate", "SymbolTable", "CodegenError"]
+__all__ = [
+    "build_symbols",
+    "translate",
+    "build_residual",
+    "SymbolTable",
+    "Residual",
+    "CodegenError",
+]
