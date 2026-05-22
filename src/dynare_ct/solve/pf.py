@@ -20,6 +20,7 @@ builds on it.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 
 import casadi as ca
@@ -44,7 +45,7 @@ from dynare_ct.solve.errors import SolveError
 from dynare_ct.solve.numeric import constant_table, eval_constant
 from dynare_ct.solve.steady import evaluate_parameters, steady_state
 
-__all__ = ["PFSolution", "solve_pf", "solve_segment"]
+__all__ = ["PFSolution", "solve_pf", "solve_segment", "initial_conditions"]
 
 _TOL = 1e-10
 _MAX_ITER = 50
@@ -93,16 +94,19 @@ def solve_pf(
     grid = uniform_grid(horizon, intervals)
 
     ss = steady_state(model, exogenous=e)
-    initial_states = _initial_states(model, theta, e, ss)
+    initial_states = initial_conditions(model, theta, e, ss)
     terminal_jumps = {name: ss[name] for name in model.jumps}
     guess = np.tile([ss[name] for name in model.endogenous], (grid.intervals + 1, 1))
+
+    def constant_exogenous(_t: float) -> dict[str, float]:
+        return e
 
     path, iterations = solve_segment(
         model,
         residual,
         grid,
         theta=theta,
-        exogenous=e,
+        exogenous_at=constant_exogenous,
         initial_states=initial_states,
         terminal_jumps=terminal_jumps,
         guess=guess,
@@ -118,18 +122,22 @@ def solve_segment(
     grid: Grid,
     *,
     theta: dict[str, float],
-    exogenous: dict[str, float],
+    exogenous_at: Callable[[float], dict[str, float]],
     initial_states: dict[str, float],
     terminal_jumps: dict[str, float],
     guess: np.ndarray,
     tol: float = _TOL,
     max_iter: int = _MAX_ITER,
 ) -> tuple[np.ndarray, int]:
-    """Solve one segment numerically, returning ``(path (N+1, n), iterations)``."""
+    """Solve one segment numerically, returning ``(path (N+1, n), iterations)``.
+
+    ``exogenous_at(t)`` gives the exogenous values at time ``t``; the
+    collocation evaluates it at the interval midpoints and grid points,
+    so a time-varying belief path is handled directly.
+    """
     theta_dm = _vector(theta[name] for name in model.parameters)
-    e_dm = _vector(exogenous.get(name, 0.0) for name in model.exogenous)
     residual_fn, jacobian_fn = _build_system(
-        model, residual, grid, theta_dm, e_dm, initial_states, terminal_jumps
+        model, residual, grid, theta_dm, exogenous_at, initial_states, terminal_jumps
     )
     x0 = guess.reshape(-1).astype(float)
     x, iterations = _newton(residual_fn, jacobian_fn, x0, tol, max_iter)
@@ -146,7 +154,7 @@ def _build_system(
     residual: Residual,
     grid: Grid,
     theta: ca.DM,
-    e: ca.DM,
+    exogenous_at: Callable[[float], dict[str, float]],
     initial_states: dict[str, float],
     terminal_jumps: dict[str, float],
 ) -> tuple[ca.Function, ca.Function]:
@@ -157,6 +165,10 @@ def _build_system(
     dynamic_rows, algebraic_rows = _row_split(residual, model)
     index = {name: k for k, name in enumerate(model.endogenous)}
 
+    def exogenous(t: float) -> ca.DM:
+        values = exogenous_at(float(t))
+        return _vector(values.get(name, 0.0) for name in model.exogenous)
+
     points = grid.intervals + 1
     X = ca.SX.sym("X", n * points)
 
@@ -166,10 +178,12 @@ def _build_system(
     rows: list[ca.SX] = []
     xdot_zero = ca.DM.zeros(n_dynamic, 1)
     for i in range(grid.intervals):
-        midpoint = interval(block(i), block(i + 1), e, theta, grid.midpoints[i], grid.dt)
+        t_mid = grid.midpoints[i]
+        midpoint = interval(block(i), block(i + 1), exogenous(t_mid), theta, t_mid, grid.dt)
         rows.extend(midpoint[r] for r in dynamic_rows)
     for j in range(points):
-        pointwise = full(xdot_zero, block(j), e, theta, grid.points[j])
+        t_j = grid.points[j]
+        pointwise = full(xdot_zero, block(j), exogenous(t_j), theta, t_j)
         rows.extend(pointwise[r] for r in algebraic_rows)
     for state in model.states:
         rows.append(block(0)[index[state]] - initial_states[state])
@@ -241,9 +255,10 @@ def _to_csc(jacobian: ca.DM) -> csc_matrix:
 # ---------------------------------------------------------------------------
 
 
-def _initial_states(
+def initial_conditions(
     model: Model, theta: dict[str, float], e: dict[str, float], ss: dict[str, float]
 ) -> dict[str, float]:
+    """Evaluate the initval initial states, resolving steady_state(.) via ``ss``."""
     table = constant_table(theta, e, model)
     result: dict[str, float] = {}
     for state in model.states:

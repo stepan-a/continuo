@@ -30,12 +30,17 @@ class Grid:
         return len(self.midpoints)
 
 
-def uniform_grid(horizon: float, intervals: int) -> Grid:
-    """Build a uniform grid over ``[0, horizon]`` with ``intervals`` intervals."""
+def uniform_grid(horizon: float, intervals: int, start: float = 0.0) -> Grid:
+    """Build a uniform grid over ``[start, start + horizon]`` with ``intervals`` intervals.
+
+    ``start`` offsets the grid so a simulation segment beginning at a
+    reveal time uses absolute times (the shock paths and ``t`` are in
+    absolute time).
+    """
     if horizon <= 0:
         raise SolveError("simulation horizon T must be positive")
     if intervals < 1:
         raise SolveError("number of grid intervals N must be at least 1")
-    points = np.linspace(0.0, float(horizon), intervals + 1)
+    points = float(start) + np.linspace(0.0, float(horizon), intervals + 1)
     midpoints = 0.5 * (points[:-1] + points[1:])
     return Grid(points=points, midpoints=midpoints, dt=float(horizon) / intervals)

@@ -9,10 +9,12 @@ Public API so far::
 from __future__ import annotations
 
 from dynare_ct.solve.errors import SolveError
+from dynare_ct.solve.orchestrator import simulate
 from dynare_ct.solve.pf import PFSolution, solve_pf, solve_segment
 from dynare_ct.solve.steady import evaluate_parameters, steady_state
 
 __all__ = [
+    "simulate",
     "steady_state",
     "evaluate_parameters",
     "solve_pf",
