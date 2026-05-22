@@ -65,3 +65,7 @@ def _write_csv(solution: Solution, output: Path) -> None:
         writer.writerow(["t", *solution.names])
         for time, row in zip(solution.t, solution.path, strict=True):
             writer.writerow([time, *row])
+
+
+if __name__ == "__main__":
+    sys.exit(main())
