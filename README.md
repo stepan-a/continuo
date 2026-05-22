@@ -1,6 +1,6 @@
-# dynare-ct
+# continuo
 
-[![pipeline status](https://git.ithaca.fr/stepan/dynare-ct/badges/master/pipeline.svg)](https://git.ithaca.fr/stepan/dynare-ct/-/pipelines)
+[![pipeline status](https://git.ithaca.fr/stepan/continuo/badges/master/pipeline.svg)](https://git.ithaca.fr/stepan/continuo/-/pipelines)
 
 Continuous-time DSGE toolbox in the spirit of Dynare. A Python toolbox
 for solving continuous-time macroeconomic models, with perfect-foresight
@@ -23,8 +23,8 @@ for the time being.
   library).
 - Symbolic model representation, sparsity-aware Jacobians and C codegen
   via CasADi; sparse linear solve via SciPy.
-- A CLI (`dynare-ct model.mod`) and a programmatic Python API
-  (`import dynare_ct`).
+- A CLI (`continuo model.mod`) and a programmatic Python API
+  (`import continuo`).
 
 Deferred: discretisation schemes beyond Crank–Nicolson (Radau,
 Lobatto-IIIA), adaptive meshes, and HDF5/parquet output.
@@ -34,8 +34,8 @@ Lobatto-IIIA), adaptive meshes, and HDF5/parquet output.
 No release yet — install from source:
 
 ```bash
-git clone https://git.ithaca.fr/stepan/dynare-ct
-cd dynare-ct
+git clone https://git.ithaca.fr/stepan/continuo
+cd continuo
 pip install -e .
 ```
 
@@ -75,9 +75,9 @@ simulate(T=50, N=250);
 From Python:
 
 ```python
-import dynare_ct
+import continuo
 
-model = dynare_ct.parse("rbc.mod")
+model = continuo.parse("rbc.mod")
 sol = model.simul()                 # reads the simulate command
 
 sol.t                               # time grid (numpy array)
@@ -91,8 +91,8 @@ sol.to_dataframe()                  # pandas DataFrame (optional extra)
 From the command line (writes `rbc.csv`):
 
 ```bash
-dynare-ct rbc.mod
-dynare-ct rbc.mod -o out.csv -T 100 -N 500   # override output / horizon / grid
+continuo rbc.mod
+continuo rbc.mod -o out.csv -T 100 -N 500   # override output / horizon / grid
 ```
 
 ## Running the testsuite
@@ -150,7 +150,7 @@ pytest                       # full suite (tests/ is discovered automatically)
 pytest -q --tb=short         # quiet output, short tracebacks (as in CI)
 pytest tests/parser          # only the parser tests
 pytest -k shocks             # only tests whose name matches "shocks"
-pytest --cov=dynare_ct       # with a coverage report
+pytest --cov=continuo       # with a coverage report
 
 ruff check src tests         # lint (as in CI)
 ruff format --check src tests # formatting check (as in CI)
@@ -163,4 +163,4 @@ See [`LICENSE`](LICENSE).
 
 ## Repository
 
-<https://git.ithaca.fr/stepan/dynare-ct>
+<https://git.ithaca.fr/stepan/continuo>

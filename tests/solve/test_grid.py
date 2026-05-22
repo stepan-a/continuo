@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from dynare_ct.solve import SolveError
-from dynare_ct.solve.disc import uniform_grid
+from continuo.solve import SolveError
+from continuo.solve.disc import uniform_grid
 
 
 def test_uniform_grid_layout():

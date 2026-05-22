@@ -6,7 +6,7 @@ import csv
 
 import pytest
 
-from dynare_ct.cli import main
+from continuo.cli import main
 
 SADDLE = """
 var(state) x;
@@ -69,7 +69,7 @@ def test_model_error_is_reported_cleanly(tmp_path, capsys):
     bad = write_model(tmp_path, "var(state) K;\nvar Y;\nmodel;\n  K = Y;\n  Y = 1;\nend;")
     assert main([str(bad)]) == 1
     err = capsys.readouterr().err
-    assert err.startswith("dynare-ct: error:")
+    assert err.startswith("continuo: error:")
     assert "K" in err
 
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from dynare_ct.macro import MacroError, expand, expand_string
+from continuo.macro import MacroError, expand, expand_string
 
 
 def test_basic_include(tmp_path):

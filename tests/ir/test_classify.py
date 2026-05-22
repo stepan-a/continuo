@@ -10,8 +10,8 @@ from __future__ import annotations
 
 import pytest
 
-from dynare_ct.ir import IRError, build, classify
-from dynare_ct.parser import parse
+from continuo.ir import IRError, build, classify
+from continuo.parser import parse
 
 # A small but complete model: one state (K), one jump (C), one algebraic (Y).
 RBC = """

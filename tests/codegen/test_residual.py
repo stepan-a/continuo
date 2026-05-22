@@ -10,9 +10,9 @@ from __future__ import annotations
 import casadi as ca
 import pytest
 
-from dynare_ct.codegen import build_residual
-from dynare_ct.ir import build
-from dynare_ct.parser import parse
+from continuo.codegen import build_residual
+from continuo.ir import build
+from continuo.parser import parse
 
 # states=[K], algebraic=[Y], parameters=[alpha]; no exogenous.
 #   r1 = diff(K) - (Y - K)   ;   r2 = Y - K^alpha

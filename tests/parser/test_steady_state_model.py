@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from dynare_ct.parser import parse
-from dynare_ct.parser.ast import (
+from continuo.parser import parse
+from continuo.parser.ast import (
     Assignment,
     BinaryOp,
     FunctionCall,
@@ -17,7 +17,7 @@ from dynare_ct.parser.ast import (
     SteadyStateModelBlock,
     UnaryOp,
 )
-from dynare_ct.parser.errors import LarkError
+from continuo.parser.errors import LarkError
 
 
 def _ssm(text: str) -> SteadyStateModelBlock:

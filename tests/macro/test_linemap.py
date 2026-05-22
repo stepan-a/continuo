@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from dynare_ct.macro import expand, expand_string
-from dynare_ct.macro.linemap import Frame, LineMap, Origin
+from continuo.macro import expand, expand_string
+from continuo.macro.linemap import Frame, LineMap, Origin
 
 
 def test_plain_lines_map_one_to_one():

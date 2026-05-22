@@ -5,10 +5,10 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from dynare_ct.io import Segment, Solution
-from dynare_ct.ir import build
-from dynare_ct.parser import parse
-from dynare_ct.solve import simulate
+from continuo.io import Segment, Solution
+from continuo.ir import build
+from continuo.parser import parse
+from continuo.solve import simulate
 
 TRACKER = """
 var(state) x;

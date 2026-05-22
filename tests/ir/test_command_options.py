@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from dynare_ct.ir import IRError, build
-from dynare_ct.parser import parse
+from continuo.ir import IRError, build
+from continuo.parser import parse
 
 HEADER = """
 var(state) K;

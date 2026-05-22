@@ -9,15 +9,15 @@ from __future__ import annotations
 
 import pytest
 
-from dynare_ct.parser import parse
-from dynare_ct.parser.ast import (
+from continuo.parser import parse
+from continuo.parser.ast import (
     DictLiteral,
     Identifier,
     NumberLit,
     SimulateCommand,
     SteadyCommand,
 )
-from dynare_ct.parser.errors import LarkError
+from continuo.parser.errors import LarkError
 
 
 def _last(text: str):
@@ -218,7 +218,7 @@ def test_gallery_example_5_sequential_surprises():
     )
     model = parse(text)
     # Three reveal times → three path assignments on A.
-    from dynare_ct.parser.ast import ShocksBlock
+    from continuo.parser.ast import ShocksBlock
 
     sb = next(s for s in model.statements if isinstance(s, ShocksBlock))
     a_entry = next(e for e in sb.entries if e.name.name == "A")
@@ -241,7 +241,7 @@ def test_gallery_example_6_instantaneous_permanent():
     """
     )
     model = parse(text)
-    from dynare_ct.parser.ast import InitvalBlock
+    from continuo.parser.ast import InitvalBlock
 
     iv = next(s for s in model.statements if isinstance(s, InitvalBlock))
     assert iv.steady is True

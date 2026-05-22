@@ -1,4 +1,4 @@
-# GitLab CI for dynare-ct.
+# GitLab CI for continuo.
 #
 # Designed for a shell-executor runner (no Docker) on Debian stable
 # with Python 3.13 available as `python3.13`. Each job creates a
@@ -38,7 +38,7 @@ cache:
 lint:
   stage: lint
   only:
-    - master@stepan/dynare-ct
+    - master@stepan/continuo
   script:
     - pip install --quiet ruff
     - ruff check src tests
@@ -54,7 +54,7 @@ lint:
 test:
   stage: test
   only:
-    - master@stepan/dynare-ct
+    - master@stepan/continuo
   script:
     - pip install --quiet -e ".[dev]"
     - pytest -q --tb=short

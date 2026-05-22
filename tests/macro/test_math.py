@@ -6,7 +6,7 @@ import math
 
 import pytest
 
-from dynare_ct.macro.eval import MacroError, evaluate
+from continuo.macro.eval import MacroError, evaluate
 
 
 def ev(text: str, **env):

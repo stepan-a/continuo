@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from dynare_ct.macro.eval import MacroError, evaluate, is_truthy, value_to_text
+from continuo.macro.eval import MacroError, evaluate, is_truthy, value_to_text
 
 
 def ev(text: str, **env):

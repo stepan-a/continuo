@@ -5,9 +5,9 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from dynare_ct.ir import build
-from dynare_ct.parser import parse
-from dynare_ct.solve import SolveError, simulate, solve_pf
+from continuo.ir import build
+from continuo.parser import parse
+from continuo.solve import SolveError, simulate, solve_pf
 
 
 def model(src: str):

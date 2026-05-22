@@ -1,4 +1,4 @@
-"""Automation sessions for dynare-ct.
+"""Automation sessions for continuo.
 
 Run ``nox`` to execute the default sessions (lint and the testsuite on the
 current interpreter), or ``nox -s <session>`` to pick one. Each session runs
@@ -47,4 +47,4 @@ def tests(session):
 def coverage(session):
     """Run the testsuite with a coverage report."""
     session.install("-e", ".[dev]")
-    session.run("pytest", "--cov=dynare_ct", "--cov-report=term-missing", *session.posargs)
+    session.run("pytest", "--cov=continuo", "--cov-report=term-missing", *session.posargs)

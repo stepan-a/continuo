@@ -10,10 +10,10 @@ from __future__ import annotations
 import casadi as ca
 import pytest
 
-from dynare_ct.codegen import CodegenError, build_symbols, translate
-from dynare_ct.codegen.translate import SymbolTable
-from dynare_ct.parser import parse
-from dynare_ct.parser.ast import ParameterValue
+from continuo.codegen import CodegenError, build_symbols, translate
+from continuo.codegen.translate import SymbolTable
+from continuo.parser import parse
+from continuo.parser.ast import ParameterValue
 
 
 def expr_of(text: str):
@@ -172,7 +172,7 @@ def test_unary_arity_error():
 
 
 def test_build_symbols_covers_the_model():
-    from dynare_ct.ir import build
+    from continuo.ir import build
 
     model = build(
         parse(
@@ -186,7 +186,7 @@ def test_build_symbols_covers_the_model():
 
 
 def test_translate_a_real_equation_residual():
-    from dynare_ct.ir import build
+    from continuo.ir import build
 
     model = build(
         parse(

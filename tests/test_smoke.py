@@ -1,18 +1,18 @@
 """Smoke tests: package imports cleanly and exposes its version."""
 
-import dynare_ct
+import continuo
 
 
 def test_version_is_set():
-    assert isinstance(dynare_ct.__version__, str)
-    assert dynare_ct.__version__ == "0.0.1"
+    assert isinstance(continuo.__version__, str)
+    assert continuo.__version__ == "0.0.1"
 
 
 def test_subpackages_import():
-    import dynare_ct.codegen  # noqa: F401
-    import dynare_ct.io  # noqa: F401
-    import dynare_ct.ir  # noqa: F401
-    import dynare_ct.macro  # noqa: F401
-    import dynare_ct.parser  # noqa: F401
-    import dynare_ct.solve  # noqa: F401
-    import dynare_ct.solve.disc  # noqa: F401
+    import continuo.codegen  # noqa: F401
+    import continuo.io  # noqa: F401
+    import continuo.ir  # noqa: F401
+    import continuo.macro  # noqa: F401
+    import continuo.parser  # noqa: F401
+    import continuo.solve  # noqa: F401
+    import continuo.solve.disc  # noqa: F401

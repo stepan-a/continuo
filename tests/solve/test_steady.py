@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from dynare_ct.ir import build
-from dynare_ct.parser import parse
-from dynare_ct.solve import SolveError, evaluate_parameters, steady_state
+from continuo.ir import build
+from continuo.parser import parse
+from continuo.solve import SolveError, evaluate_parameters, steady_state
 
 
 def model(src: str):

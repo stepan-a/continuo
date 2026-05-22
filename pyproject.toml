@@ -3,7 +3,7 @@ requires = ["hatchling>=1.18"]
 build-backend = "hatchling.build"
 
 [project]
-name = "dynare-ct"
+name = "continuo"
 version = "0.0.1"
 description = "Continuous-time DSGE toolbox in the spirit of Dynare."
 readme = "README.md"
@@ -54,14 +54,14 @@ dev = [
 ]
 
 [project.scripts]
-dynare-ct = "dynare_ct.cli:main"
+continuo = "continuo.cli:main"
 
 [project.urls]
-Homepage = "https://git.ithaca.fr/stepan/dynare-ct"
-Repository = "https://git.ithaca.fr/stepan/dynare-ct"
+Homepage = "https://git.ithaca.fr/stepan/continuo"
+Repository = "https://git.ithaca.fr/stepan/continuo"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/dynare_ct"]
+packages = ["src/continuo"]
 
 [tool.pytest.ini_options]
 minversion = "7.0"

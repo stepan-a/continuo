@@ -5,8 +5,8 @@ from __future__ import annotations
 
 import pytest
 
-from dynare_ct.macro import MacroError, expand, expand_string
-from dynare_ct.macro.eval import evaluate
+from continuo.macro import MacroError, expand, expand_string
+from continuo.macro.eval import evaluate
 
 
 def ev(text: str, **env):

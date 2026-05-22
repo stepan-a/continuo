@@ -12,9 +12,9 @@ import shutil
 import casadi as ca
 import pytest
 
-from dynare_ct.codegen import CodegenError, build_residual, compile_residual
-from dynare_ct.ir import build
-from dynare_ct.parser import parse
+from continuo.codegen import CodegenError, build_residual, compile_residual
+from continuo.ir import build
+from continuo.parser import parse
 
 pytestmark = pytest.mark.skipif(
     shutil.which(os.environ.get("CC", "gcc")) is None, reason="no C compiler available"

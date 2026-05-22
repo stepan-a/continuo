@@ -1,0 +1,194 @@
+// continuo grammar.
+//
+// Declarations:
+//   - var declarations, with optional (state) / (jump) qualifier
+//   - varexo declarations
+//   - parameters declarations
+//
+// Expressions:
+//   - arithmetic: + - * / ^ (^ right-associative)
+//   - comparison: < <= > >= == != (non-chainable; left-associative)
+//   - logical: && || (and unary !)
+//   - unary minus
+//   - parenthesised expressions
+//   - function calls: f(), f(a), f(a, b, ...), f(a, x=b)
+//   - dict literals: {}, {k: v, ...}
+//   - string literals: 'single-quoted' or "double-quoted"
+//
+// Statements:
+//   - parameter-value assignments: name = expr;
+//   - model block: model; <equation>* end;
+//   - initval block: initval [(steady [, kwarg, ...])]; <assignment>* end;
+//   - initial_guess block: initial_guess; <assignment>* end;
+//   - shocks block: shocks; (var <name>; <path>+)* end;
+//   - steady_state_model block: steady_state_model; <assignment>* end;
+//   - simulate command: simulate(<arg_list>);
+//   - steady command:   steady; OR steady(<arg_list>);
+//
+// Path assignments inside a shocks block:
+//   - path = <expr>;                              (default reveal time t=0)
+//   - path at t = <expr> = <expr>;                (explicit reveal time)
+//
+// Equations (inside the model block):
+//   - explicit:        [tags?] LHS = RHS ;
+//   - bare expression: [tags?] expr ;     (interpreted as expr = 0)
+//   - equation tags:   [key='value', key='value', ...]
+//
+// Comments: // line and /* block */.
+//
+// Operator precedence, low → high:
+//   ||
+//   &&
+//   !
+//   < <= > >= == !=
+//   + -
+//   * /
+//   unary -
+//   ^
+//   atom (number, string, identifier, function call, dict literal,
+//         parenthesised expression)
+
+start: statement+
+
+?statement: var_decl
+          | varexo_decl
+          | parameters_decl
+          | param_value
+          | model_block
+          | initval_block
+          | initial_guess_block
+          | shocks_block
+          | steady_state_model_block
+          | simulate_command
+          | steady_command
+
+// --- declarations -----------------------------------------------------------
+
+var_decl: "var" var_qualifier ident_list ";"  -> var_decl_qualified
+        | "var" ident_list ";"                 -> var_decl_unqualified
+
+var_qualifier: "(" IDENT ")"
+
+varexo_decl: "varexo" ident_list ";"
+
+parameters_decl: "parameters" ident_list ";"
+
+param_value: IDENT "=" expr ";"
+
+ident_list: IDENT ("," IDENT)*
+
+// --- model block ------------------------------------------------------------
+
+model_block: "model" ";" equation* "end" ";"
+
+equation: tags equation_body ";"  -> equation_with_tags
+        | equation_body ";"        -> equation_without_tags
+
+equation_body: expr "=" expr  -> equation_eq
+             | expr             -> equation_zero
+
+tags: "[" tag ("," tag)* "]"
+
+tag: IDENT "=" STRING
+
+// --- initval and initial_guess blocks --------------------------------------
+
+initval_block: "initval" ";" assignment* "end" ";"                                              -> initval_plain
+             | "initval" "(" "steady" ")" ";" assignment* "end" ";"                             -> initval_steady
+             | "initval" "(" "steady" "," kwarg ("," kwarg)* ")" ";" assignment* "end" ";"      -> initval_steady_kwargs
+
+initial_guess_block: "initial_guess" ";" assignment* "end" ";"
+
+assignment: expr "=" expr ";"
+
+// --- shocks block -----------------------------------------------------------
+
+shocks_block: "shocks" ";" shock_entry* "end" ";"
+
+shock_entry: "var" IDENT ";" path_assignment+
+
+path_assignment: "path" "=" expr ";"                          -> path_default
+               | "path" "at" IDENT "=" expr "=" expr ";"      -> path_at_explicit
+
+// --- steady_state_model block ----------------------------------------------
+
+steady_state_model_block: "steady_state_model" ";" assignment* "end" ";"
+
+// --- commands ---------------------------------------------------------------
+
+simulate_command: "simulate" "(" arg_list ")" ";"
+
+steady_command: "steady" ";"                       -> steady_bare
+              | "steady" "(" arg_list ")" ";"      -> steady_with_args
+
+// --- expressions ------------------------------------------------------------
+
+?expr: or_expr
+
+?or_expr: or_expr "||" and_expr  -> or_op
+        | and_expr
+
+?and_expr: and_expr "&&" not_expr  -> and_op
+         | not_expr
+
+?not_expr: "!" not_expr  -> not_op
+         | cmp_expr
+
+?cmp_expr: add_expr CMP_OP add_expr  -> cmp_op
+         | add_expr
+
+?add_expr: add_expr ADD_OP mul_expr  -> add_op
+         | mul_expr
+
+?mul_expr: mul_expr MUL_OP unary_expr  -> mul_op
+         | unary_expr
+
+?unary_expr: "-" unary_expr  -> neg_op
+           | pow_expr
+
+?pow_expr: atom "^" unary_expr  -> pow_op
+         | atom
+
+?atom: number_atom
+     | string_atom
+     | dict_literal
+     | func_call
+     | ident_atom
+     | "(" expr ")"
+
+number_atom: NUMBER
+string_atom: STRING
+ident_atom: IDENT
+
+dict_literal: "{" "}"                     -> dict_empty
+            | "{" dict_entries "}"         -> dict_nonempty
+
+dict_entries: dict_entry ("," dict_entry)*
+
+dict_entry: IDENT ":" expr
+
+func_call: IDENT "(" ")"           -> func_call_no_args
+         | IDENT "(" arg_list ")"   -> func_call_with_args
+
+arg_list: arg ("," arg)*
+
+?arg: kwarg | expr
+
+kwarg: IDENT "=" expr
+
+// --- terminals --------------------------------------------------------------
+
+CMP_OP: "<=" | ">=" | "==" | "!=" | "<" | ">"
+ADD_OP: "+" | "-"
+MUL_OP: "*" | "/"
+
+IDENT: /[A-Za-z_][A-Za-z0-9_]*/
+NUMBER: /\d+(\.\d+)?([eE][+-]?\d+)?/
+STRING: /'[^'\n]*'/ | /"[^"\n]*"/
+
+COMMENT_LINE: /\/\/[^\n]*/
+COMMENT_BLOCK: /\/\*[\s\S]*?\*\//
+
+%ignore COMMENT_LINE
+%ignore COMMENT_BLOCK
+%ignore /\s+/

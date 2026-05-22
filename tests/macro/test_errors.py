@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from dynare_ct.macro import MacroError, expand_string
+from continuo.macro import MacroError, expand_string
 
 
 def expand(src: str):

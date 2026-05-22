@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from dynare_ct.ir import IRError, build
-from dynare_ct.parser import parse
-from dynare_ct.parser.ast import FunctionCall, NumberLit
+from continuo.ir import IRError, build
+from continuo.parser import parse
+from continuo.parser.ast import FunctionCall, NumberLit
 
 # A first-order model with two states (K, A), one jump (C), one algebraic (Y).
 HEADER = """

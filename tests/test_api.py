@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-import dynare_ct
-from dynare_ct import Model, Solution
+import continuo
+from continuo import Model, Solution
 
 RBC = """
 var(state) K, A;
@@ -52,14 +52,14 @@ simulate(T=5, N=20);
 
 
 def test_parse_string_returns_a_model():
-    model = dynare_ct.parse_string(SADDLE)
+    model = continuo.parse_string(SADDLE)
     assert isinstance(model, Model)
     assert model.states == ("x",)
     assert model.jumps == ("y",)
 
 
 def test_model_inspection_properties():
-    model = dynare_ct.parse_string(RBC)
+    model = continuo.parse_string(RBC)
     assert model.states == ("K", "A")
     assert model.jumps == ("C",)
     assert model.algebraic == ("Y",)
@@ -69,20 +69,20 @@ def test_model_inspection_properties():
 
 
 def test_simul_returns_a_solution():
-    sol = dynare_ct.parse_string(SADDLE).simul()
+    sol = continuo.parse_string(SADDLE).simul()
     assert isinstance(sol, Solution)
     assert sol.t.shape == (21,)
     assert sol["x"][0] == pytest.approx(1.0)
 
 
 def test_simul_reads_the_command_and_overrides():
-    model = dynare_ct.parse_string(SADDLE)
+    model = continuo.parse_string(SADDLE)
     assert model.simul().t[-1] == pytest.approx(5.0)
     assert model.simul(horizon=2.0, intervals=4).t[-1] == pytest.approx(2.0)
 
 
 def test_steady_state():
-    ss = dynare_ct.parse_string(RBC).steady_state(exogenous={"z": 1.0})
+    ss = continuo.parse_string(RBC).steady_state(exogenous={"z": 1.0})
     # K* = (alpha z / (rho + delta))^(1/(1-alpha))
     expected_k = (0.33 * 1.0 / (0.05 + 0.1)) ** (1 / (1 - 0.33))
     assert ss["K"] == pytest.approx(expected_k, rel=1e-6)
@@ -94,8 +94,8 @@ def test_end_to_end_rbc_transition():
         "initval(steady);\nend;",
         "initval;\n  K = 0.9 * steady_state(K);\n  A = steady_state(A);\nend;",
     )
-    sol = dynare_ct.parse_string(src).simul()
-    ss = dynare_ct.parse_string(RBC).steady_state(exogenous={"z": 1.0})
+    sol = continuo.parse_string(src).simul()
+    ss = continuo.parse_string(RBC).steady_state(exogenous={"z": 1.0})
     assert sol["K"][0] == pytest.approx(0.9 * ss["K"], rel=1e-6)
     assert sol["K"][-1] == pytest.approx(ss["K"], rel=1e-3)  # returns to SS
 
@@ -103,7 +103,7 @@ def test_end_to_end_rbc_transition():
 def test_parse_reads_a_file(tmp_path):
     path = tmp_path / "saddle.mod"
     path.write_text(SADDLE)
-    model = dynare_ct.parse(path)
+    model = continuo.parse(path)
     assert model.simul().t[-1] == pytest.approx(5.0)
 
 
@@ -117,5 +117,5 @@ def test_parse_resolves_includes(tmp_path):
         "initval;\n  x = 0;\nend;\n"
         "simulate(T=20, N=200);"
     )
-    sol = dynare_ct.parse(main).simul()
+    sol = continuo.parse(main).simul()
     assert sol["x"][-1] == pytest.approx(2.0, abs=1e-3)  # x* = a = 2

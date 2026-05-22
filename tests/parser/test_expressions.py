@@ -10,8 +10,8 @@ from __future__ import annotations
 
 import pytest
 
-from dynare_ct.parser import parse
-from dynare_ct.parser.ast import (
+from continuo.parser import parse
+from continuo.parser.ast import (
     BinaryOp,
     Expr,
     FunctionCall,
@@ -20,7 +20,7 @@ from dynare_ct.parser.ast import (
     ParameterValue,
     UnaryOp,
 )
-from dynare_ct.parser.errors import LarkError
+from continuo.parser.errors import LarkError
 
 
 def _rhs(text: str) -> Expr:

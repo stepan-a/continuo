@@ -5,10 +5,10 @@ from __future__ import annotations
 import casadi as ca
 import pytest
 
-from dynare_ct.codegen import build_residual
-from dynare_ct.ir import build
-from dynare_ct.parser import parse
-from dynare_ct.solve.disc import crank_nicolson_residual
+from continuo.codegen import build_residual
+from continuo.ir import build
+from continuo.parser import parse
+from continuo.solve.disc import crank_nicolson_residual
 
 EMPTY = ca.DM.zeros(0, 1)
 
