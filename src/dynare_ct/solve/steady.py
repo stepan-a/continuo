@@ -21,11 +21,11 @@ from __future__ import annotations
 import casadi as ca
 import numpy as np
 
-from dynare_ct.codegen.errors import CodegenError
 from dynare_ct.codegen.residual import build_residual
-from dynare_ct.codegen.translate import SymbolTable, translate
+from dynare_ct.codegen.translate import SymbolTable
 from dynare_ct.ir.model import Model
 from dynare_ct.solve.errors import SolveError
+from dynare_ct.solve.numeric import constant_table, eval_constant
 
 __all__ = ["evaluate_parameters", "steady_state"]
 
@@ -39,7 +39,7 @@ def evaluate_parameters(model: Model) -> dict[str, float]:
     table = SymbolTable()
     values: dict[str, float] = {}
     for name, expr in model.parameter_values.items():
-        values[name] = _const(expr, table, what=f"value of parameter {name!r}")
+        values[name] = eval_constant(expr, table, what=f"value of parameter {name!r}")
         table.symbols[name] = ca.SX(values[name])
     missing = [p for p in model.parameters if p not in values]
     if missing:
@@ -73,10 +73,10 @@ def steady_state(
 
 
 def _analytical(model: Model, theta: dict[str, float], e: dict[str, float]) -> dict[str, float]:
-    table = _constant_table(theta, e, model)
+    table = constant_table(theta, e, model)
     result: dict[str, float] = {}
     for name, expr in model.steady_state.items():
-        result[name] = _const(expr, table, what=f"steady state of {name!r}")
+        result[name] = eval_constant(expr, table, what=f"steady state of {name!r}")
         table.symbols[name] = ca.SX(result[name])
     return result
 
@@ -143,9 +143,9 @@ def _starting_iterate(
 ) -> np.ndarray:
     values: dict[str, float] = {}
     if model.initial_guess:
-        table = _constant_table(theta, e, model)
+        table = constant_table(theta, e, model)
         for name, expr in model.initial_guess.items():
-            values[name] = _const(expr, table, what=f"initial_guess for {name!r}")
+            values[name] = eval_constant(expr, table, what=f"initial_guess for {name!r}")
     if guess:
         values.update(guess)
     return np.array([values.get(name, 1.0) for name in model.endogenous], dtype=float)
@@ -154,26 +154,6 @@ def _starting_iterate(
 # ---------------------------------------------------------------------------
 # helpers
 # ---------------------------------------------------------------------------
-
-
-def _constant_table(theta: dict[str, float], e: dict[str, float], model: Model) -> SymbolTable:
-    """A symbol table whose parameters/exogenous/t are bound to constants."""
-    table = SymbolTable()
-    for name, value in theta.items():
-        table.symbols[name] = ca.SX(value)
-    for name in model.exogenous:
-        table.symbols[name] = ca.SX(e.get(name, 0.0))
-    table.symbols["t"] = ca.SX(0.0)  # the steady state is time-invariant
-    return table
-
-
-def _const(expr, table: SymbolTable, *, what: str) -> float:
-    try:
-        return float(ca.evalf(translate(expr, table)))
-    except CodegenError as exc:
-        raise SolveError(f"{what}: {exc}") from None
-    except RuntimeError as exc:  # non-constant expression slipped through
-        raise SolveError(f"{what} is not a constant: {exc}") from None
 
 
 def _vector(values) -> ca.DM:
