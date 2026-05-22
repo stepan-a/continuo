@@ -17,10 +17,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from dynare_ct.ir.boundary import attach_boundary
 from dynare_ct.ir.classify import classify
+from dynare_ct.ir.commands import attach_commands
 from dynare_ct.ir.errors import IRError
 from dynare_ct.ir.model import Model
 from dynare_ct.ir.reduce import reduce_orders
+from dynare_ct.ir.shocks import attach_shocks
+from dynare_ct.ir.steady_state import attach_steady_state
 from dynare_ct.parser.ast import (
     Identifier,
     ModelBlock,
@@ -57,6 +61,10 @@ def build(model_file: ModelFile) -> Model:
     if model.equations:
         model = reduce_orders(model)
         classify(model)
+        model = attach_boundary(model, model_file)
+        model = attach_steady_state(model, model_file)
+        model = attach_shocks(model, model_file)
+        model = attach_commands(model, model_file)
     return model
 
 

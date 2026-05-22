@@ -17,6 +17,49 @@ from dataclasses import dataclass, field
 from dynare_ct.parser.ast import Equation, Expr, VarKind
 
 
+@dataclass(frozen=True)
+class ShockPath:
+    """One (reveal time, expected path) belief for a shock.
+
+    ``reveal_time`` is the instant agents adopt this belief (a literal 0
+    for the bare ``path = …`` sugar); ``path`` is the believed exogenous
+    path as an expression in the reserved time variable ``t``.
+    """
+
+    reveal_time: Expr
+    path: Expr
+
+
+@dataclass(frozen=True)
+class Shock:
+    """The belief sequence for one exogenous variable, ordered by reveal time."""
+
+    name: str
+    paths: tuple[ShockPath, ...]
+
+
+@dataclass(frozen=True)
+class Simulation:
+    """A perfect-foresight run: horizon T, grid intervals N, and the scheme."""
+
+    horizon: Expr
+    grid: Expr
+    scheme: str
+
+
+@dataclass(frozen=True)
+class SteadyQuery:
+    """A steady-state inspection point.
+
+    ``time`` is the point on the horizon to evaluate at (``None`` for the
+    bare ``steady;`` default of ``t = T``); ``exogenous`` is an optional
+    ``e={…}`` override expression.
+    """
+
+    time: Expr | None
+    exogenous: Expr | None
+
+
 @dataclass
 class Model:
     """Symbol tables and equations of a continuous-time model.
@@ -33,6 +76,20 @@ class Model:
     parameters: tuple[str, ...] = ()
     parameter_values: dict[str, Expr] = field(default_factory=dict)
     equations: tuple[Equation, ...] = ()
+    # Left-boundary data: state name -> initial-value expression (with the
+    # auxiliary states keyed by their __aux_diff_ name). The solver's
+    # optional starting iterate, keyed by endogenous variable.
+    initial_values: dict[str, Expr] = field(default_factory=dict)
+    initial_guess: dict[str, Expr] = field(default_factory=dict)
+    # Analytical steady state x_ss = h(theta, e), endogenous name -> RHS
+    # expression; empty when no steady_state_model block is given.
+    steady_state: dict[str, Expr] = field(default_factory=dict)
+    # Exogenous belief paths, one entry per varexo that the shocks block
+    # drives; empty when no shocks block is given.
+    shocks: tuple[Shock, ...] = ()
+    # Validated simulate / steady commands, in source order.
+    simulations: tuple[Simulation, ...] = ()
+    steady_queries: tuple[SteadyQuery, ...] = ()
 
     @property
     def endogenous(self) -> tuple[str, ...]:
