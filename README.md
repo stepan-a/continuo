@@ -7,31 +7,93 @@ for solving continuous-time macroeconomic models, with perfect-foresight
 deterministic transitions, multi-revelation surprises, and permanent
 parameter changes.
 
-**Status: pre-alpha. No releases yet.** The toolbox is in early
-implementation; the design lives in a separate document maintained
-outside this repository for the time being.
+**Status: pre-alpha. No releases yet.** The pipeline runs end to end —
+a `.mod` file solves to a path — but interfaces may still change. The
+design lives in a separate document maintained outside this repository
+for the time being.
 
-## Features (planned, v1)
+## Features
 
-- Continuous-time perfect-foresight solver via stacked collocation +
-  Newton on a sparse two-point boundary value problem.
-- Multi-segment information structures: anticipated, unanticipated,
-  and sequentially-revised shocks; permanent parameter changes.
-- Symbolic model representation, sparsity propagation, and Jacobian
-  generation via CasADi; sparse linear solve via SciPy.
-- Macroprocessor compatible with Dynare's `@#define`, `@#if`,
-  `@#for`, `@#include` directives.
+- Continuous-time perfect-foresight solver: stacked collocation
+  (Crank–Nicolson) + Newton on a sparse two-point boundary value problem.
+- Multi-segment information structures: anticipated, permanent, and
+  MIT-style surprise shocks, stitched by state continuity.
+- Macroprocessor compatible with Dynare's `@#define`, `@#if`, `@#for`,
+  `@#include` (plus function macros, comprehensions, and a real-math
+  library).
+- Symbolic model representation, sparsity-aware Jacobians and C codegen
+  via CasADi; sparse linear solve via SciPy.
 - A CLI (`dynare-ct model.mod`) and a programmatic Python API
   (`import dynare_ct`).
 
+Deferred: discretisation schemes beyond Crank–Nicolson (Radau,
+Lobatto-IIIA), adaptive meshes, and HDF5/parquet output.
+
 ## Installation
 
+No release yet — install from source:
+
 ```bash
-pip install dynare-ct
+git clone https://git.ithaca.fr/stepan/dynare-ct
+cd dynare-ct
+pip install -e .
 ```
 
-(Optional extras: `pip install "dynare-ct[pandas,xarray,hdf5]"` for
-the corresponding `Solution` conversion methods.)
+Optional extras for the `Solution` conversion methods (`to_dataframe`,
+`to_xarray`): `pip install -e ".[pandas,xarray,hdf5]"`.
+
+## Usage
+
+A small model, `rbc.mod` — a one-sector growth model with an anticipated
+rise in productivity `z` at `t = 5`, starting 20% below the steady state:
+
+```
+var(state) K;
+var(jump)  C;
+var        Y;
+varexo     z;
+parameters alpha, delta, rho;
+alpha = 0.33;  delta = 0.1;  rho = 0.05;
+
+model;
+  diff(K) = Y - C - delta * K;              // capital accumulation
+  diff(C) = C * (alpha * Y / K - delta - rho);   // Euler equation
+  Y = z * K^alpha;                          // production
+end;
+
+steady_state_model;
+  K = (alpha * z / (rho + delta))^(1 / (1 - alpha));
+  Y = z * K^alpha;
+  C = Y - delta * K;
+end;
+
+initval; K = 0.8 * steady_state(K); end;    // start below the steady state
+shocks;  var z; path = if(t >= 5, 1.1, 1.0); end;
+simulate(T=50, N=250);
+```
+
+From Python:
+
+```python
+import dynare_ct
+
+model = dynare_ct.parse("rbc.mod")
+sol = model.simul()                 # reads the simulate command
+
+sol.t                               # time grid (numpy array)
+sol["C"]                            # the consumption path
+sol.K                               # attribute-style access
+
+model.steady_state(exogenous={"z": 1.1})    # steady state under the new TFP
+sol.to_dataframe()                  # pandas DataFrame (optional extra)
+```
+
+From the command line (writes `rbc.csv`):
+
+```bash
+dynare-ct rbc.mod
+dynare-ct rbc.mod -o out.csv -T 100 -N 500   # override output / horizon / grid
+```
 
 ## Running the testsuite
 
@@ -52,7 +114,7 @@ the sessions:
 
 ```bash
 nox                     # default sessions: lint + tests on the current Python
-nox -s tests            # tests across Python 3.11, 3.12 and 3.13
+nox -s tests            # tests across Python 3.13 and 3.14
 nox -s lint             # ruff check + format check (as in CI)
 nox -s fix              # apply ruff autofixes and reformat in place
 nox -s coverage         # tests with a coverage report
