@@ -16,7 +16,7 @@ end;
 
 shocks;
   var e;
-  path = if(t >= 10, 0.05, 0);   // known at t=0, takes effect at t=10
+  path = 0.05 * step(t, 10);   // known at t=0, takes effect at t=10
 end;
 
 simulate(T = 50, N = 250);

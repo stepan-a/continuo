@@ -97,6 +97,16 @@ def test_anticipated_step_shock():
     assert np.all(x[after] > 0.6)
 
 
+def test_pulse_helper_in_a_shock_path():
+    # u is on (=1) only over the window [5, 10); x tracks it up then back down.
+    src = TRACKER + "shocks;\n  var u;\n  path = pulse(t, 5, 10);\nend;\nsimulate(T=30, N=300);"
+    sol = simulate(model(src))
+    x = sol["x"]
+    assert np.all(x[sol.t <= 4.0] < 0.05)  # quiet before the pulse
+    assert x[np.argmin(np.abs(sol.t - 9.5))] > 0.6  # risen during the pulse
+    assert x[-1] == pytest.approx(0.0, abs=1e-3)  # decayed back after it ends
+
+
 # --- surprise (multi-segment) ---------------------------------------------
 
 

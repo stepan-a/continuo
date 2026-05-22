@@ -13,6 +13,12 @@ and the system is well-formed. The function library matches the model
 language: arithmetic, comparison and logical operators; ``exp``, ``ln`` /
 ``log``, ``log10``, ``sqrt``, the trig and hyperbolic functions, ``erf``;
 ``abs``, ``sign``, ``min``, ``max``; and ``if(cond, a[, b])``.
+
+Shock-path expressions accept, in addition, a small library of named
+shape helpers (``step``, ``pulse``, ``ramp``, ``bump``, ``expdecay``,
+``smoothstep``). These are only meaningful as functions of time and are
+rejected in ``model`` equations; a table built for a shock path sets
+``in_shock_path`` to enable them.
 """
 
 from __future__ import annotations
@@ -47,10 +53,13 @@ class SymbolTable:
     ``symbols`` maps every endogenous variable, exogenous process,
     parameter and the reserved ``t`` to its ``SX``; ``derivatives`` maps a
     state/jump name to the ``SX`` standing for its time derivative.
+    ``in_shock_path`` is set when the table belongs to a shock-path
+    expression, which enables the time-shape helper library.
     """
 
     symbols: dict[str, ca.SX] = field(default_factory=dict)
     derivatives: dict[str, ca.SX] = field(default_factory=dict)
+    in_shock_path: bool = False
 
 
 def build_symbols(model: Model) -> SymbolTable:
@@ -105,6 +114,57 @@ _UNARY_FUNCTIONS = {
 _VARIADIC_FUNCTIONS = {"min": ca.fmin, "max": ca.fmax}
 
 
+# --- shock-path shape helpers ----------------------------------------------
+#
+# Sugars for the shapes that recur in shock paths, each an explicit function
+# of time. They are available only in shock-path expressions (the parser sees
+# their discontinuity locations in the arguments), never in model equations.
+
+
+def _step(t: ca.SX, t0: ca.SX) -> ca.SX:
+    """Unit step: 0 before ``t0``, 1 from ``t0`` on."""
+    return ca.if_else(t >= t0, 1, 0)
+
+
+def _pulse(t: ca.SX, t0: ca.SX, t1: ca.SX) -> ca.SX:
+    """Rectangular pulse: 1 on ``[t0, t1)``, 0 elsewhere."""
+    return ca.if_else(ca.logic_and(t >= t0, t < t1), 1, 0)
+
+
+def _ramp(t: ca.SX, t0: ca.SX, t1: ca.SX) -> ca.SX:
+    """Saturating ramp: 0 before ``t0``, linear to 1 over ``[t0, t1]``, then 1."""
+    return ca.fmin(ca.fmax((t - t0) / (t1 - t0), 0), 1)
+
+
+def _bump(t: ca.SX, t0: ca.SX, t1: ca.SX) -> ca.SX:
+    """Smooth (C-infinity) bump on ``(t0, t1)``: 0 outside, peak 1 at the centre."""
+    x = (t - (t0 + t1) / 2) / ((t1 - t0) / 2)
+    inside = x * x < 1
+    safe = ca.if_else(inside, 1 - x * x, 1)  # keep the exponent finite outside
+    return ca.if_else(inside, ca.exp(1 - 1 / safe), 0)
+
+
+def _expdecay(t: ca.SX, t0: ca.SX, tau: ca.SX) -> ca.SX:
+    """Exponential decay: 0 before ``t0``, ``exp(-(t-t0)/tau)`` (so 1 at ``t0``) after."""
+    return ca.if_else(t >= t0, ca.exp(-(t - t0) / tau), 0)
+
+
+def _smoothstep(t: ca.SX, t0: ca.SX, k: ca.SX) -> ca.SX:
+    """Logistic step centred at ``t0`` with steepness ``k`` (0.5 at ``t0``)."""
+    return 1 / (1 + ca.exp(-k * (t - t0)))
+
+
+# name -> (argument count, builder)
+_SHOCK_HELPERS = {
+    "step": (2, _step),
+    "pulse": (3, _pulse),
+    "ramp": (3, _ramp),
+    "bump": (3, _bump),
+    "expdecay": (3, _expdecay),
+    "smoothstep": (3, _smoothstep),
+}
+
+
 def translate(expr: Expr, table: SymbolTable) -> ca.SX:
     """Lower an AST expression to a CasADi ``SX`` against ``table``."""
     if isinstance(expr, NumberLit):
@@ -137,6 +197,16 @@ def _call(call: FunctionCall, table: SymbolTable) -> ca.SX:
     if name == "if":
         return _if(call, table)
     args = [translate(arg, table) for arg in call.args]
+    if name in _SHOCK_HELPERS:
+        if not table.in_shock_path:
+            raise CodegenError(
+                f"{name}() is a shock-path helper and is not available in model equations",
+                call.pos,
+            )
+        arity, builder = _SHOCK_HELPERS[name]
+        if len(args) != arity:
+            raise CodegenError(f"{name}() takes exactly {arity} arguments", call.pos)
+        return builder(*args)
     if name in _UNARY_FUNCTIONS:
         if len(args) != 1:
             raise CodegenError(f"{name}() takes exactly one argument", call.pos)

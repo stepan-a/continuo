@@ -188,7 +188,7 @@ def _active_exogenous(
 
 
 def _belief_value(expr: Expr, param_symbols: dict[str, ca.SX], t: float) -> float:
-    table = SymbolTable(symbols=dict(param_symbols))
+    table = SymbolTable(symbols=dict(param_symbols), in_shock_path=True)
     table.symbols["t"] = ca.SX(t)
     try:
         return float(ca.evalf(translate(expr, table)))

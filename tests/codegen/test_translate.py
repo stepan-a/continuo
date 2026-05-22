@@ -185,6 +185,63 @@ def test_build_symbols_covers_the_model():
     assert set(table.derivatives) == {"K"}  # only the state has a derivative
 
 
+# --- shock-path shape helpers ---------------------------------------------
+
+
+def shock_value(text: str, t: float) -> float:
+    """Translate a shock-path expression and evaluate it at time ``t``."""
+    table = SymbolTable({"t": ca.SX.sym("t")}, in_shock_path=True)
+    result = translate(expr_of(text), table)
+    return float(ca.Function("f", [table.symbols["t"]], [result])(t))
+
+
+def test_step_helper():
+    assert shock_value("step(t, 2)", 1.9) == 0.0
+    assert shock_value("step(t, 2)", 2.0) == 1.0
+
+
+def test_pulse_helper_is_one_on_a_half_open_window():
+    assert shock_value("pulse(t, 2, 4)", 1.9) == 0.0
+    assert shock_value("pulse(t, 2, 4)", 2.0) == 1.0
+    assert shock_value("pulse(t, 2, 4)", 3.0) == 1.0
+    assert shock_value("pulse(t, 2, 4)", 4.0) == 0.0
+
+
+def test_ramp_helper_saturates():
+    assert shock_value("ramp(t, 2, 4)", 1.0) == 0.0
+    assert shock_value("ramp(t, 2, 4)", 3.0) == pytest.approx(0.5)
+    assert shock_value("ramp(t, 2, 4)", 5.0) == 1.0
+
+
+def test_bump_helper_peaks_at_the_centre():
+    assert shock_value("bump(t, 2, 6)", 2.0) == 0.0
+    assert shock_value("bump(t, 2, 6)", 4.0) == pytest.approx(1.0)
+    assert shock_value("bump(t, 2, 6)", 6.0) == 0.0
+
+
+def test_expdecay_helper():
+    assert shock_value("expdecay(t, 2, 3)", 1.0) == 0.0
+    assert shock_value("expdecay(t, 2, 3)", 2.0) == pytest.approx(1.0)
+    assert shock_value("expdecay(t, 2, 3)", 5.0) == pytest.approx(0.36787944117)  # exp(-(5-2)/3)
+
+
+def test_smoothstep_helper_is_half_at_the_centre():
+    assert shock_value("smoothstep(t, 2, 2)", 2.0) == pytest.approx(0.5)
+    assert shock_value("smoothstep(t, 2, 2)", 10.0) > 0.99
+
+
+def test_helper_rejects_wrong_arity():
+    with pytest.raises(CodegenError, match="pulse.. takes exactly 3 arguments"):
+        shock_value("pulse(t, 2)", 0.0)
+
+
+def test_helpers_are_rejected_in_model_equations():
+    # The default table has in_shock_path=False, like a model equation.
+    table = SymbolTable({"t": ca.SX.sym("t")})
+    with pytest.raises(CodegenError, match="pulse.. is a shock-path helper"):
+        translate(expr_of("pulse(t, 1, 2)"), table)
+
+
 def test_translate_a_real_equation_residual():
     from continuo.ir import build
 
