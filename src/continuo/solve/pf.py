@@ -301,7 +301,8 @@ def _resolve_steady_state(
         right = _resolve_steady_state(expr.right, steady_at, table, model)
         return BinaryOp(expr.op, left, right, expr.pos)
     if isinstance(expr, UnaryOp):
-        return UnaryOp(expr.op, _resolve_steady_state(expr.operand, steady_at, table, model), expr.pos)
+        operand = _resolve_steady_state(expr.operand, steady_at, table, model)
+        return UnaryOp(expr.op, operand, expr.pos)
     if isinstance(expr, DictLiteral):
         return DictLiteral(
             [
@@ -319,16 +320,15 @@ def _steady_override(call: FunctionCall, table, model: Model) -> dict[str, float
     for kw in call.kwargs:
         if kw.name.name != "e":
             raise SolveError(
-                f"steady_state(): unsupported argument {kw.name.name!r} (only e={{…}} is allowed here)"
+                f"steady_state(): unsupported argument {kw.name.name!r} "
+                "(only e={…} is allowed here)"
             )
         if not isinstance(kw.value, DictLiteral):
             raise SolveError("steady_state() 'e' override must be a {…} mapping")
         for entry in kw.value.entries:
             name = entry.key.name
             if name not in model.exogenous:
-                raise SolveError(
-                    f"steady_state() e={{…}}: {name!r} is not an exogenous variable"
-                )
+                raise SolveError(f"steady_state() e={{…}}: {name!r} is not an exogenous variable")
             override[name] = eval_constant(
                 entry.value, table, what=f"steady_state e override for {name!r}"
             )
