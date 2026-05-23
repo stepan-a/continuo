@@ -261,8 +261,7 @@ class SteadyCommand:
     Bare ``steady;`` defaults to ``t = T`` under the final information
     set. The optional argument list may carry ``t=…`` (which point on
     the simulated horizon) and / or ``e={…}`` (an explicit exogenous
-    configuration) — see /Steady state and initial conditions/ in the
-    design document. Validation lives in the IR.
+    configuration). Validation lives in the IR.
     """
 
     args: list[Expr] = field(default_factory=list)
