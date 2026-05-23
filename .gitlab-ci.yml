@@ -19,6 +19,8 @@ default:
 stages:
   - lint
   - test
+  - docs
+  - deploy
 
 variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
@@ -58,5 +60,47 @@ test:
   script:
     - pip install --quiet -e ".[dev]"
     - pytest -q --tb=short
+  tags:
+    - stepan@puck
+
+
+# ---------------------------------------------------------------------------
+# Docs stage — build the Sphinx reference manual with warnings-as-errors.
+# The HTML output is published as an artifact so the deploy job can pick
+# it up directly.
+# ---------------------------------------------------------------------------
+
+docs:
+  stage: docs
+  only:
+    - master@stepan/continuo
+  script:
+    - pip install --quiet -e ".[docs]"
+    - sphinx-build -W --keep-going -b html doc/manual doc/manual/_build/html
+  artifacts:
+    paths:
+      - doc/manual/_build/html
+    expire_in: 1 week
+  tags:
+    - stepan@puck
+
+
+# ---------------------------------------------------------------------------
+# Deploy stage — rsync the built manual to the production directory on
+# the same host (the runner is shell-executor on puck). `--delete` keeps
+# the destination an exact mirror of the build, so renamed/removed pages
+# disappear; the target should therefore contain only the manual.
+# ---------------------------------------------------------------------------
+
+deploy_docs:
+  stage: deploy
+  only:
+    - master@stepan/continuo
+  needs:
+    - docs
+  before_script: []      # no Python venv needed; the job just rsyncs
+  script:
+    - mkdir -p /puck/www/continuo.adjemian.eu
+    - rsync -av --delete doc/manual/_build/html/ /puck/www/continuo.adjemian.eu/
   tags:
     - stepan@puck

@@ -52,6 +52,11 @@ dev = [
     "ruff>=0.5",
     "nox>=2024.3",
 ]
+docs = [
+    "sphinx>=7.0",
+    "furo>=2023.0",
+    "sphinx-copybutton>=0.5",
+]
 
 [project.scripts]
 continuo = "continuo.cli:main"
