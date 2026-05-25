@@ -42,3 +42,17 @@ env/
 
 # Sphinx documentation builds
 doc/manual/_build/
+
+# LaTeX auxiliary files (rubber --clean handles these; pattern is a safety net)
+*.aux
+*.log
+*.nav
+*.out
+*.snm
+*.toc
+*.synctex.gz
+*.rubbercache
+git.hash
+
+# Generated PDF (built and deployed by CI; see .gitlab-ci.yml)
+examples/nk-nonlinear/derivations.pdf

@@ -6,7 +6,7 @@ liquidity-trap path, prints a one-line summary, and (if matplotlib is
 available) writes examples/nk-nonlinear/nk-nonlinear.png with the four
 canonical panels: the consumption gap from steady state, inflation,
 policy rate (with the zero lower bound visible), and the exogenous
-natural rate that drives all three.
+productivity A that drives all three.
 
 Run from anywhere with continuo importable (e.g. ``pip install -e .``):
 
@@ -34,7 +34,7 @@ def main() -> None:
     runs = []
     for label, filename in SCENARIOS.items():
         model = continuo.parse(HERE / filename)
-        ss = model.steady_state(exogenous={"rnat": 0.02})
+        ss = model.steady_state(exogenous={"A": 1.0})
         sol = model.simul()
         c_gap = (sol["C"] / ss["C"] - 1.0) * 100.0
         zlb_frac = float(np.mean(sol["R"] < 1e-4))
@@ -59,7 +59,7 @@ def main() -> None:
         ("C-gap (% from steady state)", lambda sol, ss: (sol["C"] / ss["C"] - 1) * 100),
         ("Inflation pi", lambda sol, ss: sol["pi"]),
         ("Policy rate R", lambda sol, ss: sol["R"]),
-        ("Natural rate rnat", None),  # recovered analytically below
+        ("Productivity A", None),  # recovered analytically below
     ]
     for ax, (title, getter) in zip(axes.flat, panels, strict=True):
         for label, sol, ss, _ in runs:
@@ -67,11 +67,11 @@ def main() -> None:
                 ax.plot(sol.t, getter(sol, ss), lw=1.6, label=label)
         ax.set_title(title)
 
-    # rnat is the same exogenous path across scenarios; reconstruct it on
-    # the grid analytically: rho - 0.06 * pulse(t, 0, 2).
+    # A is the same exogenous path across scenarios; reconstruct it on
+    # the grid analytically: 1 + 0.12 * pulse(t, 0, 3).
     t = runs[0][1].t
-    rnat = 0.02 - 0.06 * ((t >= 0) & (t < 2)).astype(float)
-    axes[1, 1].plot(t, rnat, lw=1.6, color="0.4")
+    A_path = 1.0 + 0.12 * ((t >= 0) & (t < 3)).astype(float)
+    axes[1, 1].plot(t, A_path, lw=1.6, color="0.4")
 
     # mark the ZLB floor at 0 on the policy-rate panel
     axes[1, 0].axhline(0, color="0.6", ls="--", lw=1)
@@ -79,7 +79,7 @@ def main() -> None:
     for ax in axes[-1]:
         ax.set_xlabel("time")
     axes[0, 0].legend(loc="best", fontsize=8)
-    fig.suptitle("Nonlinear NK liquidity trap: baseline vs external vs internal habit")
+    fig.suptitle("Nonlinear NK trap from a TFP boom: baseline vs external vs internal habit")
     fig.tight_layout()
 
     out = HERE / "nk-nonlinear.png"

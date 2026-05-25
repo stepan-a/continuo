@@ -1,0 +1,945 @@
+\synctex=1
+\documentclass[11pt,aspectratio=169]{beamer}
+
+\usepackage[T1]{fontenc}
+\usepackage[english,provide=*]{babel}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{mathtools}
+\usepackage{bm}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes,calc}
+\usepackage{pgfplots}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\pgfplotsset{compat=1.18}
+
+\usefonttheme[onlymath]{serif}
+
+\definecolor{darkblue}{RGB}{0,51,102}
+\definecolor{lightblue}{RGB}{230,240,250}
+\definecolor{darkgreen}{RGB}{0,102,51}
+\definecolor{darkred}{RGB}{153,0,0}
+\definecolor{orange}{RGB}{255,128,0}
+\definecolor{violet}{RGB}{102,0,153}
+\definecolor{lightgreen}{RGB}{220,245,220}
+\definecolor{lightorange}{RGB}{255,240,220}
+\definecolor{gray}{gray}{0.4}
+
+% Git hash for the footer.
+\usepackage{xstring}
+\usepackage{catchfile}
+\immediate\write18{git rev-parse HEAD > git.hash}
+\CatchFileDef{\HEAD}{git.hash}{\endlinechar=-1}
+\newcommand{\gitrevision}{\StrLeft{\HEAD}{7}}
+
+\usepackage{ccicons}
+
+\setbeamertemplate{footline}{
+  \hfill\vspace*{1pt}\href{https://creativecommons.org/publicdomain/zero/1.0/deed.en}{\cczero}\enspace\href{https://git.ithaca.fr/stepan/continuo}{\gitrevision}\enspace--\enspace\insertframenumber/\inserttotalframenumber\enspace--\enspace\today\enspace}
+
+\setbeamertemplate{navigation symbols}{}
+
+\title{Nonlinear continuous-time New Keynesian models}
+\subtitle{Algebraic derivations of the three variants in \texttt{examples/nk-nonlinear/}}
+\author{Stéphane Adjemian}
+% \date{May, 2026}
+\institute{Université du Mans}
+
+\AtBeginSection[]
+{
+  \begin{frame}
+    \frametitle{Plan}
+    \tableofcontents[currentsection]
+  \end{frame}
+}
+
+\begin{document}
+
+\begin{frame}
+\titlepage
+\end{frame}
+
+\begin{frame}{Introduction}
+
+\begin{itemize}
+
+\item This note provides algebraic derivations of nonlinear continuous-time New Keynesian
+
+  models implemented in \href{https://continuo.adjemian.eu}{Continuo}.\newline
+
+\item The three flavours differ in how habits enter the household's problem and the resulting marginal cost expressions.\newline
+
+\item All models feature a zero lower bound on the nominal interest rate, Rotemberg price adjustment costs, and a temporary productivity boom as the exogenous shock.\newline
+
+\item Code implementing these models is available in the \texttt{examples/nk-nonlinear/} directory of the Continuo repository.
+
+\end{itemize}
+
+\end{frame}
+
+
+
+
+\begin{frame}{Plan}
+\tableofcontents
+\end{frame}
+
+%==============================================================================
+\section{Common setup}
+%==============================================================================
+
+\begin{frame}{Common setup -- Overview}
+
+\begin{itemize}
+
+\item Three flavours of the fully nonlinear continuous-time New Keynesian
+  model, all in the file \texttt{examples/nk-nonlinear/}:\newline
+
+\begin{itemize}
+
+\item \texttt{baseline.mod}: standard NK with no habits.\newline
+
+\item \texttt{external\_habit.mod}: additive habits taken as given by
+  the household (catching-up-with-the-Joneses).\newline
+
+\item \texttt{internal\_habit.mod}: the same habits internalised, with
+  a costate on the habit stock.
+
+\end{itemize}
+
+\item Household preferences, the firms' Rotemberg pricing problem, the
+  monetary-policy rule with ZLB and the TFP shock are common to all
+  three.\newline
+
+\item The variants differ only in how the habit stock $X$ enters the
+  household's problem.
+
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Common setup -- Households}
+
+\begin{itemize}
+
+\item Representative household maximises
+  \[
+  U \;=\; \int_0^\infty e^{-\rho t}\,\bigg[u\bigl(C(t),X(t)\bigr) -
+  \frac{N(t)^{1+\eta}}{1+\eta}\bigg]\,dt,
+  \]
+  with discount rate $\rho>0$ and inverse Frisch elasticity~$\eta$.\newline
+
+\item Felicity $u(C,X)$ depends on a habit stock $X$ (specialised
+  below; $h=0$ removes it). Labour disutility is separable.\newline
+
+\item Budget constraint, real one-period bonds $B$:
+  \[
+  \dot B(t) \;=\; \bigl(R(t)-\pi(t)\bigr)\,B(t) + w(t)\,N(t) - C(t),
+  \]
+  with $R$ the nominal policy rate, $\pi$ inflation, $w$ the real wage.
+
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Common setup -- Firms: demand and technology}
+
+\begin{itemize}
+
+\item A continuum of monopolistically competitive intermediate firms
+  $i\in[0,1]$ supplies varieties of a single composite good. Each
+  faces the constant-elasticity demand schedule
+  \[
+  y_i \;=\; \left(\frac{p_i}{P}\right)^{-\varepsilon} Y,
+  \]
+  with $P$ the aggregate price index, $Y$ aggregate output, and
+  $\varepsilon>1$ the elasticity of substitution between varieties.\newline
+
+\item Linear technology $y_i = A\,n_i$ (with $A=1$), so the real
+  marginal cost $MC = w/A$ is the same across firms.\newline
+
+\item \textbf{Rotemberg (1982) price-adjustment cost.} Adjusting $p_i$
+  at rate $\pi_i = \dot p_i / p_i$ costs $\phi/2 \cdot \pi_i^2$ per
+  unit of output, i.e.\ a real flow cost of $\tfrac{\phi}{2}\,\pi_i^2\,Y$.\newline
+
+\item With the desired (flex-price) markup $\varepsilon/(\varepsilon-1)$,
+  the corresponding target for real marginal cost is the inverse,
+  $MC^\star = (\varepsilon-1)/\varepsilon$. The NKPC will discipline
+  $\dot\pi$ by the gap $MC - MC^\star$.
+
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Common setup -- Firms: optimisation}
+
+\begin{itemize}
+
+\item Working with the relative price $\xi_i = p_i/P$, its law of
+  motion is
+  \[
+  \dot\xi_i \;=\; \xi_i\,(\pi_i - \pi),
+  \qquad \pi = \dot P / P.
+  \]
+
+\item In equilibrium the firm is owned by the household, so it values
+  future real profits at the household's stochastic discount factor
+  \[
+  \Lambda(t) \;\equiv\; u'(C(t)) \;=\; C(t)^{-\sigma},
+  \]
+  i.e.\ the marginal utility of an extra real unit of consumption.\newline
+
+\item Firm $i$ chooses $\{\pi_i(t)\}$ to maximise
+  \[
+  \int_0^\infty e^{-\rho t}\,\Lambda(t)\,\Big[\,
+    \underbrace{\xi_i^{1-\varepsilon}\,Y}_{\text{real revenue}}
+    -
+    \underbrace{MC\,\xi_i^{-\varepsilon}\,Y}_{\text{real cost}}
+    -
+    \underbrace{\tfrac{\phi}{2}\,\pi_i^2\,Y}_{\text{adj.\ cost}}
+  \Big]\,dt.
+  \]
+
+\item Current-value Hamiltonian, with costate $\nu$ on $\xi_i$:
+  \[
+  \mathcal H \;=\; \Lambda\,\Big[\xi_i^{1-\varepsilon}\,Y
+  - MC\,\xi_i^{-\varepsilon}\,Y
+  - \tfrac{\phi}{2}\,\pi_i^2\,Y\Big]
+  + \nu\,\xi_i\,(\pi_i - \pi).
+  \]
+
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Common setup -- Firms: FOC and costate}
+
+\begin{itemize}
+
+\item FOC in the control $\pi_i$:
+  \[
+  \frac{\partial\mathcal H}{\partial\pi_i}
+  = -\Lambda\,\phi\,\pi_i\,Y + \nu\,\xi_i = 0
+  \quad\Longrightarrow\quad
+  \nu\,\xi_i \;=\; \Lambda\,\phi\,\pi_i\,Y.
+  \]
+
+\item Costate equation
+  $\dot\nu = \rho\,\nu - \partial\mathcal H / \partial\xi_i$, with
+  \[
+  \frac{\partial\mathcal H}{\partial\xi_i}
+  = \Lambda\,\big[(1-\varepsilon)\,\xi_i^{-\varepsilon}\,Y
+  + \varepsilon\,MC\,\xi_i^{-\varepsilon-1}\,Y\big]
+  + \nu\,(\pi_i - \pi).
+  \]
+
+\item Impose symmetric equilibrium ($\xi_i = 1$, $\pi_i = \pi$, all
+  firms identical). From the FOC, $\nu = \Lambda\,\phi\,\pi\,Y$. The
+  last term of $\partial\mathcal H/\partial\xi_i$ vanishes, and the
+  first two collapse to $\Lambda\,\varepsilon\,Y\,[MC - (\varepsilon-1)/\varepsilon]$:
+  \[
+  \dot\nu \;=\; \rho\,\nu - \Lambda\,\varepsilon\,Y\,
+  \big[MC - \tfrac{\varepsilon-1}{\varepsilon}\big].
+  \]
+
+\item Differentiate $\nu = \Lambda\,\phi\,\pi\,Y$ exactly using the
+  product rule:
+  \[
+  \dot\nu \;=\; \nu\,\Big[\frac{\dot\Lambda}{\Lambda}
+  + \frac{\dot\pi}{\pi} + \frac{\dot Y}{Y}\Big].
+  \]
+
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Common setup -- Firms: resource constraint and marginal cost}
+
+\begin{itemize}
+
+\item In the Rotemberg formulation the price-adjustment cost is a
+  \textbf{real resource loss} (managerial time, menu printing,
+  customer disruption, $\ldots$), paid out of aggregate output. The
+  resource constraint in symmetric equilibrium is
+  \[
+  Y \;=\; C + \tfrac{\phi}{2}\,\pi^2\,Y
+  \quad\Longleftrightarrow\quad
+  Y \;=\; \frac{C}{1 - (\phi/2)\,\pi^2}.
+  \]
+
+\item Differentiating $\log Y = \log C - \log(1 - (\phi/2)\pi^2)$
+  yields the \emph{exact} link
+  \[
+  \boxed{\frac{\dot Y}{Y} \;=\; \frac{\dot C}{C}
+  \;+\; \frac{\phi\,\pi\,\dot\pi}{1 - (\phi/2)\,\pi^2}}
+  \]
+  which we will use on the next slide to eliminate $\dot Y/Y$ from the
+  costate identity.
+
+\item Production $Y = A\,N$ gives $N = Y/A$, so the labour FOC
+  $w = N^\eta / u_C$ inserts an output factor in real marginal cost
+  $MC = w/A$:
+  \begin{align*}
+  \text{baseline:} \quad MC &= Y^\eta\,C^\sigma\,/\,A^{\eta+1}, \\
+  \text{external habit:} \quad MC &= Y^\eta\,(C - h X)^\sigma\,/\,A^{\eta+1}, \\
+  \text{internal habit:} \quad MC &= Y^\eta\,/\,(\lambda_B\,A^{\eta+1}).
+  \end{align*}
+  At $A^* = 1$ and $\pi=0$ we have $Y^* = C^*$ and these collapse to
+  the canonical no-adjustment-cost expressions used in the steady states.
+
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Common setup -- Firms: the exact NKPC, general $\sigma$}
+
+\begin{itemize}
+
+\item Combine $\dot\nu/\nu = \dot\Lambda/\Lambda + \dot\pi/\pi + \dot Y/Y$
+  (slide before last) with $\dot\Lambda/\Lambda = -\sigma\,\dot C/C$ and
+  the exact resource-constraint link
+  $\dot Y/Y = \dot C/C + (\phi\pi\dot\pi)/(1-(\phi/2)\pi^2)$:
+  \[
+  \frac{\dot\nu}{\nu}
+  \;=\; (1-\sigma)\,\frac{\dot Y}{Y}
+  + \sigma\,\frac{\phi\,\pi\,\dot\pi}{1 - (\phi/2)\,\pi^2}
+  + \frac{\dot\pi}{\pi}.
+  \]
+
+\item Equating with the costate result $\dot\nu/\nu = \rho - (\varepsilon/(\phi\pi))\,(MC - (\varepsilon-1)/\varepsilon)$ and multiplying by $\pi$:
+  \[
+  (1-\sigma)\,\frac{\dot Y}{Y}\,\pi
+  + \frac{\sigma\,\phi\,\pi^2\,\dot\pi}{1 - (\phi/2)\,\pi^2}
+  + \dot\pi
+  \;=\; \rho\,\pi - \frac{\varepsilon}{\phi}\Big(MC - \tfrac{\varepsilon-1}{\varepsilon}\Big).
+  \]
+
+\item No terms have been dropped: this is the exact NKPC residual for
+  the fully nonlinear Rotemberg model with the SDF $\Lambda = C^{-\sigma}$
+  and the proper resource constraint.\newline
+
+\item For $\sigma \neq 1$ the leading $(1-\sigma)\,\dot Y/Y\,\pi$ term
+  would require carrying $\dot Y/Y$ as an extra algebraic variable.
+  Our calibration sets $\sigma = 1$, which removes the term cleanly
+  on the next slide.
+
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Common setup -- Firms: the exact NKPC, log utility}
+
+\begin{itemize}
+
+\item Set $\sigma = 1$ (our calibration). The $(1-\sigma)\,\dot Y/Y\,\pi$
+  term vanishes, and the previous slide's equation reduces to
+  \[
+  \dot\pi\,\Big[1 + \frac{\phi\,\pi^2}{1 - (\phi/2)\,\pi^2}\Big]
+  \;=\; \rho\,\pi \;-\; \frac{\varepsilon}{\phi}\Big(MC - \tfrac{\varepsilon-1}{\varepsilon}\Big).
+  \]
+
+\item Using
+  $1 + \phi\pi^2/(1-(\phi/2)\pi^2) = (1+(\phi/2)\pi^2)/(1-(\phi/2)\pi^2)$
+  and dividing through:
+  \[
+  \boxed{\dot\pi \;=\; \frac{1 - (\phi/2)\,\pi^2}{1 + (\phi/2)\,\pi^2}\,
+  \Bigl[\rho\,\pi - \tfrac{\varepsilon}{\phi}\bigl(MC - \tfrac{\varepsilon-1}{\varepsilon}\bigr)\Bigr]}
+  \]
+
+\item The correction factor is $1$ at $\pi = 0$ (the zero-inflation
+  steady state is unchanged) and equals $\approx 0.97$ at our deepest
+  trap ($\pi \approx -2.6\%$, $\phi = 40$) --- a $\sim 3\%$ damping of
+  the NKPC relative to the canonical (approximate) form.
+
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Common setup -- Monetary policy and the TFP shock}
+
+\begin{itemize}
+
+\item Taylor-type rule, clamped at the zero lower bound:
+  \[
+  \boxed{R(t) \;=\; \max\bigl(0,\ \rho + \phi_\pi\,\pi(t)\bigr)}
+  \]
+  Intercept $\rho$ so that the no-shock steady state has $R^*=\rho$,
+  $\pi^*=0$. The $\max(0,\cdot)$ makes the model genuinely nonlinear.\newline
+
+\item \textbf{TFP shock.} The only exogenous driver is total-factor
+  productivity $A(t)$ in $Y = A\,N$. $A$ enters only the production
+  technology — it does \emph{not} enter household preferences, so
+  there is no preference shifter to propagate through the household's
+  stochastic discount factor and no inconsistency between the IS and
+  NKPC discount rates.\newline
+
+\item In the no-shock steady state $A^* = 1$. The experiment is a
+  \emph{temporary productivity boom}: $A$ rises to $1.12$ over
+  $[0, 3)$ and returns to $1$. The boom lowers real marginal cost,
+  drives deflation through the NKPC, and forces the Taylor rule onto
+  the ZLB. The recession that follows in the baseline model is the
+  classic ``supply-side deflationary trap''.
+
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Common setup -- Calibration}
+
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{lcl}
+\toprule
+symbol & value & meaning \\
+\midrule
+$\sigma$    & $1$    & inverse IES (log utility) \\
+$\eta$      & $1$    & inverse Frisch elasticity \\
+$\varepsilon$ & $6$  & elasticity of substitution (20\% markup) \\
+$\phi$      & $40$   & Rotemberg price-adjustment cost \\
+$\rho$      & $0.02$ & rate of time preference (= steady-state real rate) \\
+$\phi_\pi$  & $1.5$  & Taylor-rule inflation response \\
+$\lambda$   & $0.5$  & habit adjustment speed (habit variants only) \\
+$h$         & $0.7$  & habit weight (habit variants only) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\end{frame}
+
+%==============================================================================
+\section{Baseline: no habit}
+%==============================================================================
+
+\begin{frame}{Baseline -- Euler equation}
+
+\begin{itemize}
+
+\item With $h=0$ the felicity collapses to
+  $u(C) = C^{1-\sigma}/(1-\sigma)$, and the marginal utility of
+  consumption is $u_C = C^{-\sigma}$.\newline
+
+\item The continuous-time consumption Euler in a perfect-foresight
+  setting reads $\dfrac{d\log u_C}{dt} = \rho - R + \pi$, so
+  \[
+  -\sigma\,\frac{\dot C}{C} = \rho - R + \pi,
+  \]
+  which rearranges to the standard form
+  \[
+  \boxed{\dot C \;=\; \frac{C}{\sigma}\,\bigl(R - \pi - \rho\bigr)}
+  \]
+
+\item For log utility ($\sigma=1$) this reduces to
+  $\dot C/C = R - \pi - \rho$.
+
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Baseline -- Marginal cost}
+
+\begin{itemize}
+
+\item Labour FOC: $u_N = \lambda_B\,w$, with $u_N = -N^\eta$ (separable
+  disutility) and $\lambda_B = u_C = C^{-\sigma}$ (no habit). Therefore
+  \[
+  w \;=\; \frac{N^\eta}{u_C} \;=\; N^\eta\,C^\sigma.
+  \]
+
+\item Goods-market clearing: $Y=C$ (production absorbs consumption,
+  Rotemberg adjustment costs ignored at first order). Production gives
+  $N = Y/A = C$ at $A=1$, so
+  \[
+  \boxed{MC \;=\; \frac{w}{A} \;=\; N^\eta\,C^\sigma \;=\;
+  C^{\sigma+\eta}}
+  \]
+
+\item This closes the equation system together with the Euler and the
+  NKPC.
+
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Baseline -- Full system}
+
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.4}
+\begin{tabular}{ll}
+\toprule
+role & equation \\
+\midrule
+state      & --- \\
+jump       & $\dot C \;=\; (C/\sigma)\,(R-\pi-\rho)$ \\
+jump       & $\dot\pi \;=\; \frac{1-(\phi/2)\pi^2}{1+(\phi/2)\pi^2}\,
+              \bigl[\rho\,\pi - (\varepsilon/\phi)(MC - \tfrac{\varepsilon-1}{\varepsilon})\bigr]$ \\
+algebraic  & $Y \;=\; C\,/\,(1 - (\phi/2)\,\pi^2)$ \\
+algebraic  & $MC \;=\; Y^{\eta}\,C^{\sigma} / A^{\eta+1}$ \\
+algebraic  & $R \;=\; \max(0,\ \rho + \phi_\pi\,\pi)$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\medskip
+
+\textbf{Steady state} ($A^* = 1$): $\pi^* = 0$ gives $Y^* = C^*$, hence
+\[
+R^* = \rho, \quad
+MC^* = \frac{\varepsilon-1}{\varepsilon}, \quad
+C^* = (MC^* \cdot A^{*\,\eta+1})^{1/(\sigma+\eta)} = (MC^*)^{1/(\sigma+\eta)}.
+\]
+
+\end{frame}
+
+%==============================================================================
+\section{External habit}
+%==============================================================================
+
+\begin{frame}{External habit -- Setup}
+
+\begin{itemize}
+
+\item Felicity is now
+  \[
+  u(C, X) \;=\; \frac{(C - h X)^{1-\sigma}}{1-\sigma},
+  \qquad 0 \le h < 1,
+  \]
+  with a habit stock $X$ that evolves as an exponential moving average
+  of consumption:
+  \[
+  \boxed{\dot X \;=\; \lambda\,(C - X), \qquad \lambda > 0}
+  \]
+
+\item \textbf{External}: the household treats $X$ as a given aggregate
+  state — it does \emph{not} internalise that its own $C$ raises future
+  $X$. There is no costate on $X$ in the household's problem.\newline
+
+\item Marginal utility is
+  \[
+  u_C \;=\; (C - h X)^{-\sigma},
+  \]
+  exactly as in the no-habit problem but evaluated on the
+  habit-adjusted consumption $C - h X$.
+
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{External habit -- Euler equation}
+
+\begin{itemize}
+
+\item The Euler condition $\dfrac{d\log u_C}{dt} = \rho - R + \pi$ becomes
+  \[
+  -\sigma\,\frac{\dot C - h\,\dot X}{C - hX} \;=\; \rho - R + \pi.
+  \]
+
+\item Equivalently,
+  \[
+  \dot C - h\,\dot X \;=\; \frac{C - hX}{\sigma}\,(R - \pi - \rho),
+  \]
+  and substituting the habit law $\dot X = \lambda(C-X)$ yields the
+  habit-augmented consumption Euler
+  \[
+  \boxed{\dot C \;=\; \frac{C - hX}{\sigma}\,(R - \pi - \rho)
+  + h\,\lambda\,(C - X)}
+  \]
+
+\item When $h=0$ this reduces to the baseline Euler $\dot C =
+  (C/\sigma)(R-\pi-\rho)$.
+
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{External habit -- Marginal cost}
+
+\begin{itemize}
+
+\item The labour FOC is now
+  \[
+  w \;=\; \frac{N^\eta}{u_C} \;=\; N^\eta\,(C - hX)^\sigma.
+  \]
+
+\item Combining with $A=1$ and $N=C$ (goods-market clearing),
+  \[
+  \boxed{MC \;=\; \frac{w}{A} \;=\; C^\eta\,(C - hX)^\sigma}
+  \]
+
+\item In steady state $X^* = C^*$, so $C - hX = (1-h)C$ and
+  $MC^* = (1-h)^\sigma\,C^{*\,\sigma+\eta}$.
+
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{External habit -- Full system}
+
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.4}
+\begin{tabular}{ll}
+\toprule
+role & equation \\
+\midrule
+state      & $\dot X \;=\; \lambda\,(C - X)$ \\
+jump       & $\dot C \;=\; \tfrac{C - hX}{\sigma}\,(R - \pi - \rho)
+              + h\,\lambda\,(C - X)$ \\
+jump       & $\dot\pi \;=\; \frac{1-(\phi/2)\pi^2}{1+(\phi/2)\pi^2}\,
+              \bigl[\rho\,\pi - (\varepsilon/\phi)(MC - \tfrac{\varepsilon-1}{\varepsilon})\bigr]$ \\
+algebraic  & $Y \;=\; C\,/\,(1 - (\phi/2)\,\pi^2)$ \\
+algebraic  & $MC \;=\; Y^\eta\,(C - hX)^\sigma / A^{\eta+1}$ \\
+algebraic  & $R \;=\; \max(0,\ \rho + \phi_\pi\,\pi)$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\medskip
+
+One state, two jumps, three algebraic relations — the same saddle-path
+structure as the RBC, with the habit stock providing predetermined
+persistence and $Y$ tracking $C$ up to the adjustment-cost wedge.
+
+\end{frame}
+
+\begin{frame}{External habit -- Steady state}
+
+\begin{itemize}
+
+\item $\dot X = 0 \Rightarrow X^* = C^*$, so $C - hX = (1-h)\,C^*$ in
+  steady state.\newline
+
+\item $\dot\pi = 0$ and the Taylor rule give $\pi^* = 0$, $R^* = \rho$.\newline
+
+\item Substituting into $MC^* = (\varepsilon-1)/\varepsilon$:
+  \[
+  C^{*\,\eta}\,\bigl((1-h)\,C^*\bigr)^\sigma \;=\;
+  (1-h)^\sigma\,C^{*\,\sigma+\eta}
+  \;=\; \frac{\varepsilon-1}{\varepsilon},
+  \]
+  hence
+  \[
+  \boxed{C^* \;=\; \left(\frac{\varepsilon-1}{\varepsilon\,(1-h)^\sigma}\right)^{1/(\sigma+\eta)}}
+  \]
+
+\item When $h=0$ this collapses to the baseline steady state.
+
+\end{itemize}
+
+\end{frame}
+
+%==============================================================================
+\section{Internal habit}
+%==============================================================================
+
+\begin{frame}{Internal habit -- Hamiltonian}
+
+\begin{itemize}
+
+\item Same felicity $u(C,X) = (C - h X)^{1-\sigma}/(1-\sigma)$, same
+  habit law $\dot X = \lambda(C - X)$, but the household now
+  \textbf{internalises} the effect of $C$ on $X$.\newline
+
+\item The current-value Hamiltonian carries a costate $\mu$ on the
+  habit stock in addition to the wealth costate $\lambda_B$:
+  \[
+  \mathcal H \;=\; u(C, X) - \frac{N^{1+\eta}}{1+\eta}
+  + \lambda_B\,\bigl[(R-\pi)\,B + w\,N - C\bigr]
+  + \mu\,\lambda\,(C - X).
+  \]
+
+\item The first-order conditions and the two costate equations give
+  the full system. $C$ is no longer chosen as a forward-looking variable
+  — it is pinned algebraically at every instant by the consumption FOC.
+
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Internal habit -- First-order conditions}
+
+\begin{itemize}
+
+\item $\partial\mathcal H / \partial C = 0$:
+  \[
+  u_C - \lambda_B + \lambda\,\mu \;=\; 0
+  \quad\Longleftrightarrow\quad
+  \boxed{\lambda_B \;=\; (C - hX)^{-\sigma} + \lambda\,\mu}
+  \]
+
+  Compared with the no-habit case ($\lambda_B = u_C$), there is now an
+  extra term $\lambda\,\mu$ capturing the marginal cost of raising the
+  future habit stock.\newline
+
+\item $\partial\mathcal H / \partial N = 0$: as before,
+  \[
+  -N^\eta + \lambda_B\,w \;=\; 0
+  \quad\Longleftrightarrow\quad
+  w \;=\; \frac{N^\eta}{\lambda_B}.
+  \]
+  With $Y=C=A\,N$ and $A=1$,
+  \[
+  \boxed{MC \;=\; \frac{w}{A} \;=\; \frac{C^\eta}{\lambda_B}}
+  \]
+
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Internal habit -- Costate equations}
+
+\begin{itemize}
+
+\item \textbf{Wealth costate} $\lambda_B$:
+  \[
+  \boxed{\dot\lambda_B \;=\; \rho\,\lambda_B - \frac{\partial\mathcal H}{\partial B}
+  \;=\; \lambda_B\,(\rho - R + \pi)}
+  \]
+  With no preference shifter (the TFP shock leaves the household's
+  discount rate unchanged), $\rho$ stays as the time-preference rate
+  throughout.
+
+\item \textbf{Habit costate} $\mu$. With
+  $u_X = -h\,(C - hX)^{-\sigma} = -h\,u_C$,
+  \[
+  \dot\mu \;=\; \rho\,\mu - \frac{\partial\mathcal H}{\partial X}
+  \;=\; \rho\,\mu - \bigl(u_X - \mu\,\lambda\bigr)
+  \;=\; (\rho + \lambda)\,\mu - u_X.
+  \]
+  Substituting $u_X$:
+  \[
+  \boxed{\dot\mu \;=\; (\rho + \lambda)\,\mu + h\,(C - hX)^{-\sigma}}
+  \]
+
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Internal habit -- Why \texttt{C} is algebraic}
+
+\begin{itemize}
+
+\item The consumption FOC is an \emph{algebraic} relation between
+  $\lambda_B$, $C$, $X$ and $\mu$:
+  \[
+  (C - hX)^{-\sigma} \;=\; \lambda_B - \lambda\,\mu.
+  \]
+
+\item Solving for $C$ (the unknown not constrained by any time
+  derivative in this rearrangement):
+  \[
+  \boxed{C \;=\; h\,X + \bigl(\lambda_B - \lambda\,\mu\bigr)^{-1/\sigma}}
+  \]
+
+\item So in the BVP the predetermined state is $X$; the forward-looking
+  jumps are $\pi$, $\lambda_B$ and $\mu$; the algebraic variables are
+  $C$, $R$ and $MC$.\newline
+
+\item This reorganisation is essential for the IR's classification rule:
+  $\lambda_B$ has its own ODE and so cannot also be the LHS of an
+  algebraic equation. Writing $C$ as the LHS of the FOC keeps each
+  endogenous on exactly one side of one equation.
+
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Internal habit -- Full system}
+
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.35}
+\begin{tabular}{ll}
+\toprule
+role & equation \\
+\midrule
+state      & $\dot X \;=\; \lambda\,(C - X)$ \\
+jump       & $\dot\lambda_B \;=\; \lambda_B\,(\rho - R + \pi)$ \\
+jump       & $\dot\mu \;=\; (\rho + \lambda)\,\mu + h\,(C - hX)^{-\sigma}$ \\
+jump       & $\dot\pi \;=\; \frac{1-(\phi/2)\pi^2}{1+(\phi/2)\pi^2}\,
+              \bigl[\rho\,\pi - (\varepsilon/\phi)(MC - \tfrac{\varepsilon-1}{\varepsilon})\bigr]$ \\
+algebraic  & $C \;=\; h\,X + (\lambda_B - \lambda\,\mu)^{-1/\sigma}$ \\
+algebraic  & $Y \;=\; C\,/\,(1 - (\phi/2)\,\pi^2)$ \\
+algebraic  & $MC \;=\; Y^\eta / (\lambda_B\,A^{\eta+1})$ \\
+algebraic  & $R \;=\; \max(0,\ \rho + \phi_\pi\,\pi)$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\medskip
+
+One state, three jumps, four algebraic equations. The terminal
+boundary anchors $\pi$, $\lambda_B$ and $\mu$ at the steady state; the
+initial state $X(0)$ is set by \texttt{initval(steady)}.
+
+\end{frame}
+
+\begin{frame}{Internal habit -- Steady state, part 1}
+
+\begin{itemize}
+
+\item $\dot\pi = 0$ and the Taylor rule give $\pi^* = 0$ and
+  $R^* = \rho$.\newline
+
+\item $\dot X = 0 \Rightarrow X^* = C^*$, so $C^* - h X^* = (1-h)\,C^*$ in
+  steady state.\newline
+
+\item $\dot\mu = 0$:
+  \[
+  (\rho + \lambda)\,\mu^* + h\,\bigl((1-h)\,C^*\bigr)^{-\sigma} \;=\; 0
+  \quad\Longleftrightarrow\quad
+  \boxed{\mu^* \;=\; -\,\frac{h\,\bigl((1-h)\,C^*\bigr)^{-\sigma}}{\rho + \lambda} \;<\; 0}
+  \]
+
+  The shadow value of the habit stock is \emph{negative}: an extra unit
+  of $X$ is a burden because it lowers future marginal utility.
+
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Internal habit -- Steady state, part 2}
+
+\begin{itemize}
+
+\item Consumption FOC at the steady state:
+  \[
+  \lambda_B^* \;=\; (C^* - h X^*)^{-\sigma} + \lambda\,\mu^*
+  \;=\; \bigl((1-h)\,C^*\bigr)^{-\sigma}\,\Bigl(1 - \frac{\lambda h}{\rho + \lambda}\Bigr),
+  \]
+  i.e.
+  \[
+  \boxed{\lambda_B^* \;=\; \bigl((1-h)\,C^*\bigr)^{-\sigma}\,
+  \frac{\rho + \lambda - \lambda h}{\rho + \lambda}}
+  \]
+
+\item Substituting into $MC^* = C^{*\,\eta}/\lambda_B^*$ and equating to
+  $(\varepsilon-1)/\varepsilon$:
+  \[
+  \boxed{C^* \;=\; \left(\frac{\varepsilon-1}{\varepsilon\,(1-h)^\sigma}
+  \cdot \frac{\rho + \lambda - \lambda h}{\rho + \lambda}\right)^{1/(\sigma+\eta)}}
+  \]
+
+\item At $h=0$ both correction factors vanish and $C^*$ reduces to the
+  baseline value $\bigl((\varepsilon-1)/\varepsilon\bigr)^{1/(\sigma+\eta)}$.
+
+\end{itemize}
+
+\end{frame}
+
+%==============================================================================
+\section{Numerical experiment}
+%==============================================================================
+
+\begin{frame}{Experiment -- The TFP boom}
+
+\begin{itemize}
+
+\item All three variants share the same shock specification:
+  \[
+  A(t) \;=\; 1 + 0.12\,\cdot\,\mathbf{1}_{[0,3)}(t),
+  \]
+  i.e.\ productivity rises 12\% over $[0, 3)$ and snaps back to
+  $1$ thereafter. The path is known to agents at $t=0$ (single belief,
+  one segment).\newline
+
+\item Each model is solved on a uniform Crank--Nicolson grid with
+  \texttt{simulate(T=25, N=600)}. The economy starts at its
+  (model-specific) steady state through \texttt{initval(steady)} —
+  vacuous for the baseline since it has no state, and pinning
+  $X(0) = X^*$ for the habit variants.\newline
+
+\item The boom drives marginal cost down (firms can produce more
+  cheaply); the NKPC delivers deflation; the Taylor rule wants to
+  cut $R$ below zero but is clamped at the ZLB. \emph{What happens
+  to consumption then depends sharply on preferences.}
+
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Experiment -- Headline results}
+
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{lrrrr}
+\toprule
+scenario & $C$ on impact (vs SS) & $\pi$ trough & $R$ minimum & ZLB time \\
+\midrule
+baseline (no habit)        & $-4.7\%$ & $-6.60\%$ & $0$ & $9.8\%$ of horizon \\
+external habit ($h=0.7$)   & $+7.0\%$ & $-5.00\%$ & $0$ & $8.0\%$ of horizon \\
+internal habit ($h=0.7$)   & $+7.5\%$ & $-4.95\%$ & $0$ & $8.0\%$ of horizon \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\medskip
+
+\begin{itemize}
+
+\item \textbf{Baseline}: deflation ($-6.6\%$) and the ZLB binding for
+  10\% of the horizon produce a real-rate-driven recession ($C$ drops
+  4.7\% on impact). This is the classic supply-side deflationary trap.\newline
+
+\item \textbf{Habit variants}: the wealth effect from a 12\%
+  productivity boom dominates the trap channel. Consumption jumps
+  \emph{up} 7\% on impact and decays smoothly back. Deflation is
+  milder than in the baseline, and the ZLB still binds (the policy
+  rate touches zero briefly), but on a small enough share of the
+  horizon that the level of $R$ stays positive most of the time.\newline
+
+\item The contrast highlights that ``trap mechanism'' and ``recession''
+  are not synonymous: the ZLB binds in all three cases, but the
+  consumption response is sign-flipped by habit smoothing.
+
+\end{itemize}
+
+\end{frame}
+
+%==============================================================================
+\section*{References}
+%==============================================================================
+
+\begin{frame}{References -- NK and monetary policy}
+
+\begin{itemize}
+
+\item Werning, I.\ (2011). Managing a Liquidity Trap: Monetary and
+  Fiscal Policy. NBER Working Paper 17344.\newline
+
+\item Rotemberg, J.J.\ (1982). Sticky Prices in the United States.
+  \emph{Journal of Political Economy} 90(6), 1187--1211.\newline
+
+\item Cochrane, J.H.\ (2017). The New-Keynesian Liquidity Trap.
+  \emph{Journal of Monetary Economics} 92, 47--63.\newline
+
+\item Gal\'i, J.\ (2015). \emph{Monetary Policy, Inflation, and the
+  Business Cycle}. Princeton University Press.
+
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{References -- Habit formation}
+
+\begin{itemize}
+
+\item Abel, A.B.\ (1990). Asset Prices under Habit Formation and
+  Catching Up with the Joneses. \emph{American Economic Review Papers
+  and Proceedings} 80(2), 38--42.\newline
+
+\item Constantinides, G.M.\ (1990). Habit Formation: A Resolution of
+  the Equity Premium Puzzle. \emph{Journal of Political Economy}
+  98(3), 519--543.\newline
+
+\item Christiano, L.J., Eichenbaum, M., and Evans, C.L.\ (2005).
+  Nominal Rigidities and the Dynamic Effects of a Shock to Monetary
+  Policy. \emph{Journal of Political Economy} 113(1), 1--45.
+
+\end{itemize}
+
+\end{frame}
+
+\end{document}

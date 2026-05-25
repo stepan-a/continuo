@@ -11,8 +11,8 @@
 
 var(state) X;             // habit stock — predetermined
 var(jump)  C, pi;         // forward-looking
-var        R, MC;
-varexo     rnat;
+var        R, MC, Y;
+varexo     A;             // total-factor productivity
 
 parameters sigma, eta, eps, phi, rho, phipi, lam, h;
 sigma = 1;       eta   = 1;       eps   = 6;       phi   = 40;
@@ -21,9 +21,13 @@ lam   = 0.5;     // habit adjustment speed (exponential averaging rate)
 h     = 0.7;     // habit weight in u(C - h X)
 
 model;
-  // real marginal cost: w/A with the habit-adjusted labour FOC
-  // w = N^eta * (C - h X)^sigma, A = 1, N = C
-  MC = C^eta * (C - h * X)^sigma;
+  // Resource constraint with Rotemberg adjustment cost as a real resource
+  // loss: Y = C + (phi/2)*pi^2 * Y.
+  Y = C / (1 - (phi / 2) * pi^2);
+
+  // Real marginal cost with the habit-adjusted labour FOC:
+  // w = N^eta / u_C = N^eta * (C - h X)^sigma and N = Y/A.
+  MC = Y^eta * (C - h * X)^sigma / A^(eta + 1);
 
   R = max(0, rho + phipi * pi);
 
@@ -31,32 +35,34 @@ model;
   diff(X)  = lam * (C - X);
 
   // Euler equation with EXTERNAL habit. Differentiating u_C = (C - hX)^(-sigma)
-  // and equating d log(u_C)/dt = rnat - R + pi gives
-  //   d/dt (C - h X) = ((C - h X)/sigma) * (R - pi - rnat),
-  // whence diff(C) = ((C - h X)/sigma)(R - pi - rnat) + h * diff(X).
-  diff(C)  = ((C - h * X) / sigma) * (R - pi - rnat) + h * lam * (C - X);
+  // and equating d log(u_C)/dt = rho - R + pi (no preference shifter) gives
+  //   d/dt (C - h X) = ((C - h X)/sigma) * (R - pi - rho),
+  // whence diff(C) = ((C - h X)/sigma)(R - pi - rho) + h * diff(X).
+  diff(C)  = ((C - h * X) / sigma) * (R - pi - rho) + h * lam * (C - X);
 
-  // Rotemberg NKPC
-  diff(pi) = rho * pi - (eps / phi) * (MC - (eps - 1) / eps);
+  // Rotemberg NKPC, EXACT for sigma = 1: see baseline.mod for the derivation.
+  diff(pi) = (1 - (phi / 2) * pi^2) / (1 + (phi / 2) * pi^2)
+           * (rho * pi - (eps / phi) * (MC - (eps - 1) / eps));
 end;
 
 steady_state_model;
   pi = 0;
   R  = rho;
-  // X* = C* in steady state (the moving average has converged), so
-  // MC* = C*^eta * ((1 - h) C*)^sigma = C*^(sigma+eta) (1 - h)^sigma;
-  // setting MC* = (eps - 1)/eps gives:
-  C  = ((eps - 1) / (eps * (1 - h)^sigma))^(1 / (sigma + eta));
-  X  = C;
   MC = (eps - 1) / eps;
+  // X* = C* and pi*=0 give Y* = C*. Then MC* = C*^(sigma+eta) * (1-h)^sigma
+  // / A^(eta+1); solving for C*:
+  C  = (MC * A^(eta + 1) / (1 - h)^sigma)^(1 / (sigma + eta));
+  X  = C;
+  Y  = C;
 end;
 
 initval(steady);
 end;
 
 shocks;
-  var rnat;
-  path = rho - 0.06 * pulse(t, 0, 2);
+  var A;
+  // The same productivity boom as the baseline: A rises to 1.12 over [0, 3).
+  path = 1 + 0.12 * pulse(t, 0, 3);
 end;
 
 simulate(T = 25, N = 600);

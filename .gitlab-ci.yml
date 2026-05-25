@@ -104,3 +104,62 @@ deploy_docs:
     - rsync -av --delete doc/manual/_build/html/ /puck/www/continuo.adjemian.eu/
   tags:
     - stepan@puck
+
+
+# ---------------------------------------------------------------------------
+# Docs stage — compile the Beamer derivations companion for
+# examples/nk-nonlinear/ with rubber. TeXLive + rubber are assumed to be on
+# the runner host. `--clean` removes the auxiliary files after a successful
+# build so only the .pdf is left in the workspace, which is then published
+# as an artifact for the deploy stage.
+#
+# The `only.changes` clause skips the job entirely when the .tex source has
+# not been touched by the push, so casual commits to other parts of the repo
+# don't trigger an unnecessary rebuild + redeploy. The currently-deployed
+# PDF on the web server stays untouched in that case. To force a rebuild
+# without a real .tex edit, touch the file (`touch examples/nk-nonlinear/derivations.tex`)
+# or trigger the pipeline manually from the GitLab UI after pushing a
+# trivial whitespace change.
+# ---------------------------------------------------------------------------
+
+nk-nonlinear-pdf:
+  stage: docs
+  only:
+    refs:
+      - master@stepan/continuo
+    changes:
+      - examples/nk-nonlinear/derivations.tex
+  before_script: []      # no Python venv needed; rubber is system-wide
+  script:
+    - cd examples/nk-nonlinear
+    - rubber --shell-escape --pdf --clean derivations.tex
+  artifacts:
+    paths:
+      - examples/nk-nonlinear/derivations.pdf
+    expire_in: 1 week
+  tags:
+    - stepan@puck
+
+
+# ---------------------------------------------------------------------------
+# Deploy stage — publish the compiled derivations PDF at
+# https://continuo.adjemian.eu/pdf/nk-nonlinear.pdf. The README links to
+# this URL, so the PDF tracks master automatically. Same `only.changes`
+# filter as the build job: deploy runs iff the .tex has actually changed.
+# ---------------------------------------------------------------------------
+
+deploy_pdf:
+  stage: deploy
+  only:
+    refs:
+      - master@stepan/continuo
+    changes:
+      - examples/nk-nonlinear/derivations.tex
+  needs:
+    - nk-nonlinear-pdf
+  before_script: []
+  script:
+    - mkdir -p /puck/www/continuo.adjemian.eu/pdf
+    - rsync -av examples/nk-nonlinear/derivations.pdf /puck/www/continuo.adjemian.eu/pdf/nk-nonlinear.pdf
+  tags:
+    - stepan@puck
