@@ -131,8 +131,12 @@ nk-nonlinear-pdf:
       - examples/nk-nonlinear/derivations.tex
   before_script: []      # no Python venv needed; rubber is system-wide
   script:
+    # `rubber --pdf --clean` compiles the document and then removes
+    # *all* outputs (PDF included), which would leave the artifact path
+    # empty. Build without `--clean` and let the ephemeral CI workspace
+    # handle cleanup. Only the .pdf is published as an artifact.
     - cd examples/nk-nonlinear
-    - rubber --shell-escape --pdf --clean derivations.tex
+    - rubber --shell-escape --pdf derivations.tex
   artifacts:
     paths:
       - examples/nk-nonlinear/derivations.pdf
