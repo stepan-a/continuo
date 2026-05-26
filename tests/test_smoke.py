@@ -1,11 +1,17 @@
 """Smoke tests: package imports cleanly and exposes its version."""
 
+from importlib.metadata import PackageNotFoundError, version
+
 import continuo
 
 
 def test_version_is_set():
     assert isinstance(continuo.__version__, str)
-    assert continuo.__version__ == "0.0.1"
+    try:
+        expected = version("continuo")
+    except PackageNotFoundError:
+        expected = "0.0.0"
+    assert continuo.__version__ == expected
 
 
 def test_subpackages_import():
