@@ -92,6 +92,13 @@ def test_diagnostics():
     assert sol.converged is True
 
 
+def test_diagnostics_logged_at_info(caplog):
+    with caplog.at_level("INFO", logger="continuo.solve.orchestrator"):
+        simulate(model(SURPRISE))
+    messages = [rec.getMessage() for rec in caplog.records]
+    assert any("2 segment(s)" in m and "crank_nicolson" in m for m in messages)
+
+
 # --- conversions (optional dependencies) ----------------------------------
 
 

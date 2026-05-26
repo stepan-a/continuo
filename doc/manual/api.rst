@@ -34,6 +34,36 @@ records (one per active belief — see :doc:`language/shocks`):
 .. autoclass:: continuo.io.solution.Segment
    :members:
 
+Diagnostics
+-----------
+
+``Solution.diagnostics`` is a free-form ``dict`` populated by the solver
+with run-level summary information. The keys currently set are:
+
+``scheme`` (``str``)
+   The discretisation scheme that was used (e.g. ``"crank_nicolson"``).
+   Matches the ``scheme`` argument of the ``simulate`` command.
+
+``segments`` (``int``)
+   Number of perfect-foresight segments the orchestrator solved. Equals
+   ``1`` when no surprise revelations split the horizon, and ``1 + k``
+   when ``k`` surprise reveal times fall inside ``[0, T]``.
+
+``newton_iterations`` (``int``)
+   Total Newton iterations summed across all segments. A sudden jump
+   from one run to the next — same model, similar parameters — usually
+   means the new instance is closer to a singularity or the initial
+   guess is poorer; inspect the per-segment counts via
+   ``[seg.iterations for seg in sol.segments]``.
+
+The same summary is also emitted at ``logging.INFO`` level on the
+``continuo.solve.orchestrator`` logger, so a caller that configures
+``logging.basicConfig(level=logging.INFO)`` will see one line per run
+without having to read the dict.
+
+The set of keys may grow in future releases; treat unknown keys as
+informational and the documented ones as the stable contract.
+
 Exceptions
 ----------
 

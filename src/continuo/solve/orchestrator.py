@@ -23,6 +23,8 @@ interpolation.
 
 from __future__ import annotations
 
+import logging
+
 import casadi as ca
 import numpy as np
 
@@ -41,6 +43,8 @@ from continuo.solve.steady import evaluate_parameters, steady_state
 __all__ = ["simulate"]
 
 _SUPPORTED_SCHEME = "crank_nicolson"
+
+logger = logging.getLogger(__name__)
 
 
 def simulate(
@@ -117,6 +121,12 @@ def simulate(
         "segments": len(segments),
         "newton_iterations": sum(segment.iterations for segment in segments),
     }
+    logger.info(
+        "simulated %d segment(s), %d Newton iteration(s) total (%s)",
+        diagnostics["segments"],
+        diagnostics["newton_iterations"],
+        diagnostics["scheme"],
+    )
     return Solution(tuple(segments), model.endogenous, diagnostics)
 
 
