@@ -75,13 +75,25 @@ class Solution:
 
     def to_dataframe(self):
         """Return the path as a time-indexed :class:`pandas.DataFrame`."""
-        import pandas as pd
+        try:
+            import pandas as pd
+        except ImportError as exc:
+            raise ImportError(
+                "Solution.to_dataframe() requires pandas; "
+                "install it with `pip install continuo[pandas]` (or `[all]`)."
+            ) from exc
 
         return pd.DataFrame(self.path, index=pd.Index(self.t, name="t"), columns=list(self.names))
 
     def to_xarray(self):
         """Return the path as an :class:`xarray.Dataset` over the time coordinate."""
-        import xarray as xr
+        try:
+            import xarray as xr
+        except ImportError as exc:
+            raise ImportError(
+                "Solution.to_xarray() requires xarray; "
+                "install it with `pip install continuo[xarray]` (or `[all]`)."
+            ) from exc
 
         data = {name: ("t", self[name]) for name in self.names}
         return xr.Dataset(data, coords={"t": self.t})

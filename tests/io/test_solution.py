@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import builtins
+import sys
+
 import numpy as np
 import pytest
 
@@ -110,6 +113,33 @@ def test_to_xarray():
     assert set(dataset.data_vars) == {"x", "y"}
     np.testing.assert_array_equal(dataset["x"].to_numpy(), sol["x"])
     np.testing.assert_array_equal(dataset.coords["t"].to_numpy(), sol.t)
+
+
+def _hide_module(monkeypatch, name):
+    """Make ``import <name>`` raise ImportError until the patch is undone."""
+    real_import = builtins.__import__
+
+    def fake_import(modname, *args, **kwargs):
+        if modname == name or modname.startswith(name + "."):
+            raise ImportError(f"No module named '{name}'")
+        return real_import(modname, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+    monkeypatch.delitem(sys.modules, name, raising=False)
+
+
+def test_to_dataframe_without_pandas_gives_hint(monkeypatch):
+    sol = simulate(model(TRACKER + "simulate(T=2, N=4);"))
+    _hide_module(monkeypatch, "pandas")
+    with pytest.raises(ImportError, match=r"continuo\[pandas\]"):
+        sol.to_dataframe()
+
+
+def test_to_xarray_without_xarray_gives_hint(monkeypatch):
+    sol = simulate(model(TRACKER + "simulate(T=2, N=4);"))
+    _hide_module(monkeypatch, "xarray")
+    with pytest.raises(ImportError, match=r"continuo\[xarray\]"):
+        sol.to_xarray()
 
 
 # --- direct construction --------------------------------------------------
