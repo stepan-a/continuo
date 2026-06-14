@@ -168,6 +168,64 @@ def test_multiple_surprises():
     assert x[second] == pytest.approx(x[second - 1], abs=1e-3)
 
 
+def test_state_continuous_across_each_surprise_in_a_chain():
+    # The existing 3-segment test pins continuity at the second surprise only;
+    # this one pins it at the first too, so a regression in the state-carry
+    # between segment 0 and segment 1 is caught.
+    src = (
+        TRACKER + "shocks;\n  var u;\n  path = 0;\n  path at t=5 = 1;\n  path at t=10 = 2;\nend;\n"
+        "simulate(T=20, N=200);"
+    )
+    sol = simulate(model(src))
+    x = sol["x"]
+    dt = 0.1
+    first, second = int(5 / dt), int(10 / dt)
+    assert len(sol.segments) == 3
+    assert x[first] == pytest.approx(x[first - 1], abs=1e-3)
+    assert x[second] == pytest.approx(x[second - 1], abs=1e-3)
+
+
+# --- reveal-time snapping --------------------------------------------------
+
+
+def test_reveal_time_snaps_to_nearest_grid_point():
+    # dt = 0.1; reveal at t=5.07 is closer to index 51 (t=5.1) than to index 50.
+    src = (
+        TRACKER + "shocks;\n  var u;\n  path = 0;\n  path at t=5.07 = 1;\nend;\n"
+        "simulate(T=20, N=200);"
+    )
+    sol = simulate(model(src))
+    assert len(sol.segments) == 2
+    assert sol.segments[1].start_time == pytest.approx(5.1)
+
+
+def test_reveal_time_at_half_grid_point_uses_banker_rounding():
+    # dt = 1.0; Python's round() rounds half-to-even, so t=2.5 → 2 and t=3.5 → 4.
+    # This test pins that contract: a switch to "round half up" would break it.
+    src_25 = (
+        TRACKER + "shocks;\n  var u;\n  path = 0;\n  path at t=2.5 = 1;\nend;\n"
+        "simulate(T=10, N=10);"
+    )
+    src_35 = (
+        TRACKER + "shocks;\n  var u;\n  path = 0;\n  path at t=3.5 = 1;\nend;\n"
+        "simulate(T=10, N=10);"
+    )
+    assert simulate(model(src_25)).segments[1].start_time == pytest.approx(2.0)
+    assert simulate(model(src_35)).segments[1].start_time == pytest.approx(4.0)
+
+
+def test_reveal_snapped_to_grid_index_zero_does_not_create_extra_segment():
+    # dt = 0.1; reveal at t=0.03 rounds to index 0, which _segment_starts filters
+    # out (0 < index < intervals). The single segment runs under the new belief.
+    src = (
+        TRACKER + "shocks;\n  var u;\n  path = 0;\n  path at t=0.03 = 1;\nend;\n"
+        "simulate(T=20, N=200);"
+    )
+    sol = simulate(model(src))
+    assert len(sol.segments) == 1
+    assert sol.segments[0].info_set["u"] == pytest.approx(1.0)
+
+
 # --- deferred features -----------------------------------------------------
 
 
