@@ -1,7 +1,7 @@
 # Continuo
 
 [![tests](https://github.com/stepan-a/continuo/actions/workflows/tests.yml/badge.svg)](https://github.com/stepan-a/continuo/actions/workflows/tests.yml)
-[![coverage](https://codecov.io/gh/stepan-a/continuo/graph/badge.svg)](https://codecov.io/gh/stepan-a/continuo)
+[![coverage](https://raw.githubusercontent.com/stepan-a/continuo/python-coverage-comment-action-data/badge.svg)](https://htmlpreview.github.io/?https://github.com/stepan-a/continuo/blob/python-coverage-comment-action-data/htmlcov/index.html)
 [![GitLab pipeline](https://git.ithaca.fr/stepan/continuo/badges/master/pipeline.svg)](https://git.ithaca.fr/stepan/continuo/-/pipelines)
 
 Continuous-time DSGE toolbox in the spirit of Dynare. A Python toolbox
