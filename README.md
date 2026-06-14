@@ -2,7 +2,7 @@
 
 [![tests](https://github.com/stepan-a/continuo/actions/workflows/tests.yml/badge.svg)](https://github.com/stepan-a/continuo/actions/workflows/tests.yml)
 [![coverage](https://raw.githubusercontent.com/stepan-a/continuo/python-coverage-comment-action-data/badge.svg)](https://htmlpreview.github.io/?https://github.com/stepan-a/continuo/blob/python-coverage-comment-action-data/htmlcov/index.html)
-[![GitLab pipeline](https://git.ithaca.fr/stepan/continuo/badges/master/pipeline.svg)](https://git.ithaca.fr/stepan/continuo/-/pipelines)
+[![GitLab CI](https://git.ithaca.fr/stepan/continuo/badges/master/pipeline.svg?key_text=GitLab%20CI&key_width=62)](https://git.ithaca.fr/stepan/continuo/-/pipelines)
 
 Continuous-time DSGE toolbox in the spirit of Dynare. A Python toolbox
 for solving continuous-time macroeconomic models, with perfect-foresight
