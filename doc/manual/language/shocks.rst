@@ -3,7 +3,7 @@ The ``shocks`` block
 
 The ``shocks;`` block assigns each exogenous variable (``varexo``) a
 **deterministic, time-dependent path**. Stochastic innovations have no
-place here — continuo solves a perfect-foresight problem, in which the
+place here — Continuo solves a perfect-foresight problem, in which the
 realised exogenous values are the path the agents condition on.
 
 Basic syntax
@@ -83,7 +83,7 @@ They scale and shift like any expression:
 Multi-revelation surprises
 --------------------------
 
-continuo supports beliefs that change over the simulation horizon, the
+Continuo supports beliefs that change over the simulation horizon, the
 continuous-time analogue of MIT shocks. Each ``path at t = <reveal_time>
 = <expression>`` declares that *at the reveal time, agents adopt this
 expression as their belief about the entire future path of the shock*.

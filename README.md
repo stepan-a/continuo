@@ -1,4 +1,4 @@
-# continuo
+# Continuo
 
 [![pipeline status](https://git.ithaca.fr/stepan/continuo/badges/master/pipeline.svg)](https://git.ithaca.fr/stepan/continuo/-/pipelines)
 

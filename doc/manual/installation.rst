@@ -4,7 +4,7 @@ Installation
 Requirements
 ------------
 
-continuo targets Python 3.13 and above. Its runtime dependencies are:
+Continuo targets Python 3.13 and above. Its runtime dependencies are:
 
 - `CasADi <https://web.casadi.org/>`_ ≥ 3.6 (symbolic engine and AD),
 - NumPy ≥ 1.26,

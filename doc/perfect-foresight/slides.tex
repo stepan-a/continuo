@@ -132,7 +132,7 @@
   with $y_0$ given (states) and $y_{T+1} = \bar y$
   (terminal steady state).\newline
 
-\item \textbf{Continuous time} (\texttt{continuo}'s setting): the model
+\item \textbf{Continuous time} (Continuo's setting): the model
   is an implicit differential-algebraic equation (DAE)
   \[
   F\bigl(\dot x(t),\, x(t),\, e(t),\, \theta,\, t\bigr) \;=\; 0,
@@ -170,7 +170,7 @@
 
 \item Equations split accordingly into $n_d$ \emph{dynamic rows}
   (depending on $\dot x$) and $n_a$ \emph{algebraic rows}
-  (pure equalities). \texttt{continuo} detects the partition
+  (pure equalities). Continuo detects the partition
   automatically from CasADi's symbolic dependency graph.
 
 \end{itemize}
@@ -187,7 +187,7 @@
   x_s(0) \;=\; x_s^{0},
   \qquad s\in S.
   \]
-  In \texttt{continuo} these values come from the \texttt{initval}
+  In Continuo these values come from the \texttt{initval}
   block (often the initial steady state).\newline
 
 \item \textbf{Terminal condition (jumps).} Each jump $x_j$ ($j\in J$)
@@ -231,7 +231,7 @@
   c(T) = \bar c\bigl(z(T)\bigr).
   \]
 
-\item No algebraic variables here ($n_a=0$). In general \texttt{continuo}
+\item No algebraic variables here ($n_a=0$). In general Continuo
   handles $n_a>0$ transparently (intermediate definitions, market
   clearing, etc.).
 
@@ -665,7 +665,7 @@
 
 \medskip
   
-\item \textbf{Why $(1,1)$ for \texttt{continuo}.} The smallest A-stable
+\item \textbf{Why $(1,1)$ for Continuo.} The smallest A-stable
   Padé approximant of $e^z$ that is also second-order. One implicit
   solve per step — same cost as backward Euler — for one extra order
   of accuracy. Higher entries need multiple internal stages; Radau IIA
@@ -705,7 +705,7 @@
   t_{i+\frac12}\bigr)$ (evaluation at the midpoint).\newline
 
 \item The two coincide on linear problems and to leading order on
-  smooth nonlinear ones. \texttt{continuo} uses the implicit midpoint
+  smooth nonlinear ones. Continuo uses the implicit midpoint
   form: one residual evaluation per interval, and the natural
   realisation for implicit DAEs.
 
@@ -744,7 +744,7 @@
 
 \begin{itemize}
 
-\item \texttt{continuo}'s model is implicit: $F(\dot x,x,e,\theta,t)=0$.
+\item Continuo's model is implicit: $F(\dot x,x,e,\theta,t)=0$.
   The Crank--Nicolson realisation on $[t_i,t_{i+1}]$ takes:
   \[
   \dot x \;\leftarrow\; \frac{x_{i+1}-x_i}{dt}
@@ -1279,7 +1279,7 @@ stays linear in $N$.
   then update $X^{(k+1)} = X^{(k)} + \alpha\,\Delta X$ with a
   step $\alpha\in(0,1]$.\newline
 
-\item In \texttt{continuo}: SciPy's \texttt{spsolve} (sparse LU, SuperLU by
+\item In Continuo: SciPy's \texttt{spsolve} (sparse LU, SuperLU by
   default), CasADi-supplied exact sparse Jacobian, $\|G\|_\infty$
   convergence criterion ($10^{-10}$), max 50 iterations.\newline
 
@@ -1305,7 +1305,7 @@ stays linear in $N$.
   evaluated at the midpoints.\newline
 
 \item A \textbf{surprise} corresponds to a change in the information
-  set at some reveal time $t_r$. \texttt{continuo}'s orchestrator
+  set at some reveal time $t_r$. Continuo's orchestrator
   partitions $[0,T]$ into segments separated by reveal times and
   solves \emph{one} perfect-foresight problem per segment:
   \begin{itemize}
@@ -1335,7 +1335,7 @@ stays linear in $N$.
 \renewcommand{\arraystretch}{1.2}
 \begin{tabular}{p{3.4cm}p{4.4cm}p{4.4cm}}
   \toprule
-   & \textbf{Dynare} & \textbf{\texttt{continuo} (Crank--Nicolson)} \\
+   & \textbf{Dynare} & \textbf{Continuo (Crank--Nicolson)} \\
   \midrule
   Model       & $f(y_{t+1},y_t,y_{t-1},u_t,\theta)=0$ &
                 $F(\dot x, x, e, \theta, t)=0$ \\
@@ -1368,7 +1368,7 @@ stays linear in $N$.
   \]
 
 \item \textbf{Why does Dynare have a tridiagonal Jacobian but
-  \texttt{continuo} only a bidiagonal one?} Because Crank--Nicolson
+  Continuo only a bidiagonal one?} Because Crank--Nicolson
   couples \emph{two} adjacent points; a discrete-time model can also
   reference $y_{t-1}$, coupling \emph{three}.\newline
 
@@ -1391,7 +1391,7 @@ stays linear in $N$.
 
 \item \textbf{Step-size flexibility.} In Dynare $dt=1$ period is
   built in; refining requires reformulating the model at higher
-  frequency. In \texttt{continuo} $dt$ is a numerical knob: choose
+  frequency. In Continuo $dt$ is a numerical knob: choose
   $N$ until $O(dt^2)$ accuracy is sufficient.\newline
 
 \item \textbf{Calibration at the right frequency.} Continuous-time
@@ -1406,7 +1406,7 @@ stays linear in $N$.
   lower bound on the resolution.\newline
 
 \item \textbf{Symbolic differentiation.} Both pipelines need exact
-  Jacobians. \texttt{continuo} uses CasADi (operator overloading,
+  Jacobians. Continuo uses CasADi (operator overloading,
   automatic differentiation); Dynare uses a custom preprocessor that
   emits derivative code. Both are exact.
 
@@ -1430,7 +1430,7 @@ stays linear in $N$.
   continuous-time economic models: second-order accurate, A-stable,
   symmetric, only two points per stencil. It coincides with the
   implicit-midpoint rule on smooth solutions, which is the form
-  \texttt{continuo} uses internally.\newline
+  Continuo uses internally.\newline
 
 \item \textbf{Dynare} solves an analogous stacked Newton system but
   with an intrinsically discrete model, a 3-point stencil, and a sparse

@@ -1,4 +1,4 @@
-continuo |release|
+Continuo |release|
 ==================
 
 **continuo** solves continuous-time, perfect-foresight deterministic
