@@ -1,7 +1,7 @@
 Worked examples
 ===============
 
-Seven worked-out model folders ship with the source tree under
+Eight worked-out model folders ship with the source tree under
 ``examples/``. Each folder is self-contained:
 
 - a ``common.mod`` with the shared declarations, ``model`` and
@@ -12,6 +12,10 @@ Seven worked-out model folders ship with the source tree under
   API and writes an overlaid plot,
 - a ``README.md`` presenting the model, the experiments and the
   simulation results, with embedded plots.
+
+One folder, ``examples/nk-nonlinear/``, departs from this layout: its
+variants differ in the equations themselves, so they ship as
+self-contained ``.mod`` files with no shared ``common.mod``.
 
 Run any scenario with the CLI or the API exactly as in the
 :doc:`quickstart`. The list below points at the headline result of
@@ -53,6 +57,18 @@ Pure forward-looking models (jumps only, no state)
    Output gap and inflation (both jumps); the policy rate is
    ``max(0, …)`` — an occasionally-binding ZLB. A longer *expected*
    trap deepens today's recession (forward-looking amplification).
+
+``examples/nk-nonlinear/``
+   The **fully nonlinear** continuous-time New Keynesian model in
+   levels — the nonlinear companion to ``examples/nk/`` (which carries
+   the log-linearised trap). Three self-contained variants driven by the
+   same TFP shock: ``baseline`` (no habits), ``external_habit``, and
+   ``internal_habit`` (the last internalises habits, adding a costate —
+   a state — so only this variant steps outside "jumps only"). The
+   policy rate keeps the ZLB kink directly in levels. The full
+   derivations — household and Rotemberg firm problems, both habit
+   variants, every steady state — are in a Beamer companion:
+   `nk-nonlinear.pdf <https://continuo.adjemian.eu/pdf/nk-nonlinear.pdf>`_.
 
 Pure initial-value problems (states only, no jump)
 ---------------------------------------------------
