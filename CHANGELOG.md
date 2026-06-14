@@ -112,4 +112,4 @@ and the simulation results:
 - Only the Crank–Nicolson discretisation scheme is implemented;
   Radau, SDIRK and Lobatto IIIA are deferred.
 
-[0.0.1]: https://git.ithaca.fr/stepan/continuo/-/tags/v0.0.1
+[0.0.1]: https://github.com/stepan-a/continuo/releases/tag/v0.0.1

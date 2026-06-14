@@ -1,6 +1,8 @@
 # Continuo
 
-[![pipeline status](https://git.ithaca.fr/stepan/continuo/badges/master/pipeline.svg)](https://git.ithaca.fr/stepan/continuo/-/pipelines)
+[![tests](https://github.com/stepan-a/continuo/actions/workflows/tests.yml/badge.svg)](https://github.com/stepan-a/continuo/actions/workflows/tests.yml)
+[![coverage](https://codecov.io/gh/stepan-a/continuo/graph/badge.svg)](https://codecov.io/gh/stepan-a/continuo)
+[![GitLab pipeline](https://git.ithaca.fr/stepan/continuo/badges/master/pipeline.svg)](https://git.ithaca.fr/stepan/continuo/-/pipelines)
 
 Continuous-time DSGE toolbox in the spirit of Dynare. A Python toolbox
 for solving continuous-time macroeconomic models, with perfect-foresight
@@ -34,7 +36,7 @@ Lobatto-IIIA), adaptive meshes, and HDF5/parquet output.
 No release yet — install from source:
 
 ```bash
-git clone https://git.ithaca.fr/stepan/continuo
+git clone https://github.com/stepan-a/continuo
 cd continuo
 pip install -e .
 ```
@@ -163,4 +165,4 @@ See [`LICENSE`](LICENSE).
 
 ## Repository
 
-<https://git.ithaca.fr/stepan/continuo>
+<https://github.com/stepan-a/continuo>

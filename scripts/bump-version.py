@@ -104,7 +104,7 @@ def insert_changelog_entry(path: Path, new: str, *, dry_run: bool) -> None:
     entry = CHANGELOG_TEMPLATE.format(new=new, date=TODAY)
     new_text = text[: entry_match.start()] + entry + text[entry_match.start() :]
 
-    tag_link = f"[{new}]: https://git.ithaca.fr/stepan/continuo/-/tags/v{new}\n"
+    tag_link = f"[{new}]: https://github.com/stepan-a/continuo/releases/tag/v{new}\n"
     link_match = re.search(r"^\[\d", new_text, re.MULTILINE)
     if link_match is not None:
         new_text = new_text[: link_match.start()] + tag_link + new_text[link_match.start() :]

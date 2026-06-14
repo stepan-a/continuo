@@ -62,8 +62,8 @@ docs = [
 continuo = "continuo.cli:main"
 
 [project.urls]
-Homepage = "https://git.ithaca.fr/stepan/continuo"
-Repository = "https://git.ithaca.fr/stepan/continuo"
+Homepage = "https://github.com/stepan-a/continuo"
+Repository = "https://github.com/stepan-a/continuo"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/continuo"]

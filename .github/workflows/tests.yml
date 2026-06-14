@@ -1,0 +1,42 @@
+# GitHub Actions — unit tests + coverage.
+#
+# This is the SECONDARY CI. The primary pipeline (lint -> test -> docs ->
+# deploy, including the Sphinx manual and the Beamer PDFs) lives in
+# .gitlab-ci.yml on the project's own GitLab server. This workflow only
+# runs the test suite and reports coverage to Codecov; it does not build
+# or deploy the documentation.
+
+name: tests
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install package with dev extras
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run unit tests with coverage
+        run: pytest -q --cov=continuo --cov-report=xml --cov-report=term-missing
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./coverage.xml
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false

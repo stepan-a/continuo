@@ -19,7 +19,7 @@ repository root:
 
 .. code-block:: console
 
-   $ git clone https://git.ithaca.fr/stepan/continuo.git
+   $ git clone https://github.com/stepan-a/continuo.git
    $ cd continuo
    $ pip install -e .
 
