@@ -89,7 +89,10 @@ docs:
 # Deploy stage — rsync the built manual to the production directory on
 # the same host (the runner is shell-executor on puck). `--delete` keeps
 # the destination an exact mirror of the build, so renamed/removed pages
-# disappear; the target should therefore contain only the manual.
+# disappear. `--exclude=/pdf/` protects the sibling pdf/ directory (the
+# nk-nonlinear derivations PDF deployed by deploy_pdf): without it, every
+# docs deploy mirrors the manual over the web root and wipes pdf/ — the
+# bug that made https://continuo.adjemian.eu/pdf/nk-nonlinear.pdf vanish.
 # ---------------------------------------------------------------------------
 
 deploy_docs:
@@ -101,7 +104,7 @@ deploy_docs:
   before_script: []      # no Python venv needed; the job just rsyncs
   script:
     - mkdir -p /puck/www/continuo.adjemian.eu
-    - rsync -av --delete doc/manual/_build/html/ /puck/www/continuo.adjemian.eu/
+    - rsync -av --delete --exclude='/pdf/' doc/manual/_build/html/ /puck/www/continuo.adjemian.eu/
   tags:
     - stepan@puck
 
