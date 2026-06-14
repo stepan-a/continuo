@@ -32,6 +32,7 @@ env/
 .idea/
 *.swp
 *~
+.pdf-view-restore
 
 # Generated CasADi C code & compiled artefacts
 *.casadi.c
@@ -56,3 +57,4 @@ git.hash
 
 # Generated PDF (built and deployed by CI; see .gitlab-ci.yml)
 examples/nk-nonlinear/derivations.pdf
+doc/perfect-foresight/*.pdf
