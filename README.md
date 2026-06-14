@@ -31,6 +31,13 @@ for what is in this release.
 Deferred: discretisation schemes beyond Crank–Nicolson (Radau,
 Lobatto-IIIA), adaptive meshes, and HDF5/parquet output.
 
+## Documentation
+
+- **Reference manual:** <https://continuo.adjemian.eu/>
+- **Method slides** — *Solving perfect-foresight models: Crank–Nicolson
+  collocation vs. Dynare's stacked Newton:*
+  <https://continuo.adjemian.eu/pdf/perfect-foresight.pdf>
+
 ## Installation
 
 No release yet — install from source:

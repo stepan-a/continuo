@@ -170,3 +170,54 @@ deploy_pdf:
     - rsync -av examples/nk-nonlinear/derivations.pdf /puck/www/continuo.adjemian.eu/pdf/nk-nonlinear.pdf
   tags:
     - stepan@puck
+
+
+# ---------------------------------------------------------------------------
+# Docs stage — compile the perfect-foresight Beamer slides with rubber.
+# `--shell-escape` is required: the preamble runs `\write18{git rev-parse
+# HEAD > git.hash}` to stamp the footer revision, and git.hash is gitignored
+# (absent from a fresh checkout). Same `only.changes` gating as the
+# nk-nonlinear PDF: rebuild only when the .tex source is touched.
+# ---------------------------------------------------------------------------
+
+slides-pdf:
+  stage: docs
+  only:
+    refs:
+      - master@stepan/continuo
+    changes:
+      - doc/perfect-foresight/slides.tex
+  before_script: []      # no Python venv needed; rubber is system-wide
+  script:
+    - cd doc/perfect-foresight
+    - rubber --shell-escape --pdf slides
+  artifacts:
+    paths:
+      - doc/perfect-foresight/slides.pdf
+    expire_in: 1 week
+  tags:
+    - stepan@puck
+
+
+# ---------------------------------------------------------------------------
+# Deploy stage — publish the slides at
+# https://continuo.adjemian.eu/pdf/perfect-foresight.pdf (renamed from the
+# generic slides.pdf). Lives in the same pdf/ folder as nk-nonlinear.pdf,
+# protected from the docs deploy's --delete by the --exclude=/pdf/ above.
+# ---------------------------------------------------------------------------
+
+deploy_slides:
+  stage: deploy
+  only:
+    refs:
+      - master@stepan/continuo
+    changes:
+      - doc/perfect-foresight/slides.tex
+  needs:
+    - slides-pdf
+  before_script: []
+  script:
+    - mkdir -p /puck/www/continuo.adjemian.eu/pdf
+    - rsync -av doc/perfect-foresight/slides.pdf /puck/www/continuo.adjemian.eu/pdf/perfect-foresight.pdf
+  tags:
+    - stepan@puck
