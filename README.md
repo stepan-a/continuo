@@ -34,8 +34,7 @@ Lobatto-IIIA), adaptive meshes, and HDF5/parquet output.
 ## Documentation
 
 - **Reference manual:** <https://continuo.adjemian.eu/>
-- **Method slides** — *Solving perfect-foresight models: Crank–Nicolson
-  collocation vs. Dynare's stacked Newton:*
+- **Solving continuous-time perfect-foresight models**:
   <https://continuo.adjemian.eu/pdf/perfect-foresight.pdf>
 
 ## Installation
