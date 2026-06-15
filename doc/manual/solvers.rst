@@ -172,3 +172,301 @@ worst reciprocal-condition estimate over the run, and the factorisation
 fill. These make the cross-segment warm-start observable (a two-segment
 surprise shows one factorisation and one refactorisation) and surface a
 loss of conditioning before it becomes a failure.
+
+Benchmarks
+----------
+
+The tables below compare the available backends across the example models
+(end-to-end ``Model.simul()`` wall-clock and peak resident memory).
+Regenerate them with ``python examples/benchmark_solvers.py --write``.
+
+.. BENCHMARK START
+
+.. list-table:: Wall-clock per solve (median, ms)
+   :header-rows: 1
+
+   * - Model
+     - n
+     - superlu
+     - klu
+     - klu-nobtf
+     - umfpack
+     - pardiso
+   * - cagan
+     - 201
+     - 17.7
+     - 17.0
+     - 23.5
+     - 16.7
+     - 337.5
+   * - dornbusch
+     - 903
+     - 23.2
+     - 23.6
+     - 24.7
+     - 24.2
+     - 259.2
+   * - goodwin
+     - 4802
+     - 136.0
+     - 134.5
+     - 131.8
+     - 139.2
+     - 389.5
+   * - nk
+     - 1503
+     - 81.3
+     - 80.2
+     - 87.8
+     - 78.9
+     - 314.9
+   * - nk-nonlinear
+     - 3005
+     - 123.1
+     - 118.6
+     - 120.7
+     - 121.9
+     - 365.0
+   * - rbc
+     - 1004
+     - 29.7
+     - 28.2
+     - 30.0
+     - 28.1
+     - 274.4
+   * - solow
+     - 602
+     - 26.8
+     - 26.7
+     - 25.5
+     - 26.3
+     - 260.1
+   * - tobinq
+     - 903
+     - 31.9
+     - 30.1
+     - 30.6
+     - 30.4
+     - 263.8
+
+.. list-table:: Peak resident memory (MiB)
+   :header-rows: 1
+
+   * - Model
+     - n
+     - superlu
+     - klu
+     - klu-nobtf
+     - umfpack
+     - pardiso
+   * - cagan
+     - 201
+     - 81
+     - 79
+     - 79
+     - 79
+     - 119
+   * - dornbusch
+     - 903
+     - 82
+     - 80
+     - 80
+     - 82
+     - 124
+   * - goodwin
+     - 4802
+     - 96
+     - 92
+     - 92
+     - 95
+     - 151
+   * - nk
+     - 1503
+     - 84
+     - 81
+     - 82
+     - 83
+     - 129
+   * - nk-nonlinear
+     - 3005
+     - 91
+     - 88
+     - 88
+     - 90
+     - 141
+   * - rbc
+     - 1004
+     - 83
+     - 82
+     - 81
+     - 82
+     - 126
+   * - solow
+     - 602
+     - 81
+     - 80
+     - 80
+     - 81
+     - 121
+   * - tobinq
+     - 903
+     - 83
+     - 82
+     - 81
+     - 83
+     - 124
+
+Median of 5 runs of end-to-end ``Model.simul()`` (includes the CasADi build). Wall-clock in milliseconds; peak resident memory in MiB (whole process — the Python/CasADi/SciPy baseline dominates, and PARDISO loads MKL). Measured 2026-06-15 on AMD Ryzen AI 9 HX 370 w/ Radeon 890M, 24 cores, Python 3.13.12.
+
+.. BENCHMARK END
+
+Isolated linear solve
+~~~~~~~~~~~~~~~~~~~~~~~
+
+End-to-end timings are diluted by the (solver-independent) CasADi build and
+evaluation. The tables below isolate the **linear solve** on each model's
+real stacked Jacobian: ``factor + solve`` (a cold Newton step, factorising
+from scratch) and ``refactor + solve`` (the warm per-iteration cost, reusing
+the symbolic analysis and pivot order — what dominates a Newton solve once
+the analysis is amortised). This is where KLU's block back-substitution pulls
+ahead. Regenerate with ``python examples/benchmark_solvers.py --micro --write``.
+
+.. MICROBENCH START
+
+.. list-table:: factor + solve — cold, per Newton step (µs)
+   :header-rows: 1
+
+   * - Model
+     - n
+     - superlu
+     - klu
+     - klu-nobtf
+     - umfpack
+     - pardiso
+   * - cagan
+     - 201
+     - 58.1
+     - 13.9
+     - 20.8
+     - 18.0
+     - 366.0
+   * - dornbusch
+     - 903
+     - 158.9
+     - 67.3
+     - 151.0
+     - 324.3
+     - 1701
+   * - goodwin
+     - 4802
+     - 843.8
+     - 338.5
+     - 190.7
+     - 1265
+     - 2952
+   * - nk
+     - 1503
+     - 275.5
+     - 109.9
+     - 181.5
+     - 429.9
+     - 2704
+   * - nk-nonlinear
+     - 3005
+     - 510.3
+     - 164.0
+     - 503.2
+     - 909.2
+     - 2136
+   * - rbc
+     - 1004
+     - 256.5
+     - 73.7
+     - 160.1
+     - 272.2
+     - 1418
+   * - solow
+     - 602
+     - 171.8
+     - 51.6
+     - 37.4
+     - 231.3
+     - 702.9
+   * - tobinq
+     - 903
+     - 134.8
+     - 60.0
+     - 58.7
+     - 182.8
+     - 657.1
+
+.. list-table:: refactor + solve — warm, amortised analysis (µs)
+   :header-rows: 1
+
+   * - Model
+     - n
+     - superlu
+     - klu
+     - klu-nobtf
+     - umfpack
+     - pardiso
+   * - cagan
+     - 201
+     - 57.2
+     - 14.8
+     - 14.7
+     - 17.7
+     - 359.6
+   * - dornbusch
+     - 903
+     - 158.6
+     - 34.4
+     - 52.2
+     - 318.1
+     - 1359
+   * - goodwin
+     - 4802
+     - 829.5
+     - 107.3
+     - 98.3
+     - 1272
+     - 2991
+   * - nk
+     - 1503
+     - 268.8
+     - 41.6
+     - 44.9
+     - 428.8
+     - 2383
+   * - nk-nonlinear
+     - 3005
+     - 463.4
+     - 61.5
+     - 121.0
+     - 908.6
+     - 3038
+   * - rbc
+     - 1004
+     - 280.8
+     - 39.3
+     - 47.9
+     - 272.2
+     - 1386
+   * - solow
+     - 602
+     - 116.2
+     - 19.9
+     - 18.5
+     - 231.5
+     - 541.8
+   * - tobinq
+     - 903
+     - 135.3
+     - 33.6
+     - 25.7
+     - 183.1
+     - 662.5
+
+Median of 100 repetitions, timing only the linear-solve phases on each model's real stacked Jacobian (the CasADi build is excluded). ``refactor + solve`` is the dominant per-iteration cost once the analysis is amortised. Measured 2026-06-15 on AMD Ryzen AI 9 HX 370 w/ Radeon 890M, 24 cores, Python 3.13.12.
+
+.. MICROBENCH END

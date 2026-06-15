@@ -102,6 +102,45 @@ continuo rbc.mod
 continuo rbc.mod -o out.csv -T 100 -N 500   # override output / horizon / grid
 ```
 
+## Solver benchmarks
+
+The Newton solve runs on a pluggable linear backend (see the
+[Linear solvers](https://continuo.adjemian.eu/solvers.html) manual page).
+The table below compares the available backends across the example models;
+regenerate it with `python examples/benchmark_solvers.py --write`.
+
+<!-- BENCHMARK:START -->
+
+**Wall-clock per solve (median, ms)**
+
+| Model | n | superlu | klu | klu-nobtf | umfpack | pardiso |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| cagan | 201 | 17.7 | 17.0 | 23.5 | 16.7 | 337.5 |
+| dornbusch | 903 | 23.2 | 23.6 | 24.7 | 24.2 | 259.2 |
+| goodwin | 4802 | 136.0 | 134.5 | 131.8 | 139.2 | 389.5 |
+| nk | 1503 | 81.3 | 80.2 | 87.8 | 78.9 | 314.9 |
+| nk-nonlinear | 3005 | 123.1 | 118.6 | 120.7 | 121.9 | 365.0 |
+| rbc | 1004 | 29.7 | 28.2 | 30.0 | 28.1 | 274.4 |
+| solow | 602 | 26.8 | 26.7 | 25.5 | 26.3 | 260.1 |
+| tobinq | 903 | 31.9 | 30.1 | 30.6 | 30.4 | 263.8 |
+
+**Peak resident memory (MiB)**
+
+| Model | n | superlu | klu | klu-nobtf | umfpack | pardiso |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| cagan | 201 | 81 | 79 | 79 | 79 | 119 |
+| dornbusch | 903 | 82 | 80 | 80 | 82 | 124 |
+| goodwin | 4802 | 96 | 92 | 92 | 95 | 151 |
+| nk | 1503 | 84 | 81 | 82 | 83 | 129 |
+| nk-nonlinear | 3005 | 91 | 88 | 88 | 90 | 141 |
+| rbc | 1004 | 83 | 82 | 81 | 82 | 126 |
+| solow | 602 | 81 | 80 | 80 | 81 | 121 |
+| tobinq | 903 | 83 | 82 | 81 | 83 | 124 |
+
+_Median of 5 runs of end-to-end `Model.simul()` (includes the CasADi build). Wall-clock in milliseconds; peak resident memory in MiB (whole process — the Python/CasADi/SciPy baseline dominates, and PARDISO loads MKL). Measured 2026-06-15 on AMD Ryzen AI 9 HX 370 w/ Radeon 890M, 24 cores, Python 3.13.12._
+
+<!-- BENCHMARK:END -->
+
 ## Running the testsuite
 
 The tests live in `tests/` and are driven by `pytest`. The repository is

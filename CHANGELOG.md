@@ -67,6 +67,13 @@ follows [Semantic Versioning](https://semver.org).
   `solver=` directive, the `--solver` flag, the new diagnostics keys, and
   the optional-backend install (`libsuitesparse-dev`, the `umfpack` /
   `pardiso` / `solvers` extras).
+- Add `examples/benchmark_solvers.py`, which benchmarks every available
+  backend across the example models (each in an isolated subprocess) and
+  regenerates the comparison tables in the README and manual (`--write`).
+  Two modes: end-to-end `Model.simul()` wall-clock and peak memory, and an
+  isolated micro-benchmark (`--micro`) timing only the linear-solve phases
+  (`factor + solve`, `refactor + solve`) on each model's real stacked
+  Jacobian — where KLU's block back-substitution shows a ~7× edge.
 
 ## [0.0.1] — 2026-05-23
 
