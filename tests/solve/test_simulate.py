@@ -301,6 +301,48 @@ def test_symbolic_analysis_is_reused_across_segments(monkeypatch):
     assert calls == 1
 
 
+# --- per-solver diagnostics -----------------------------------------------
+
+
+_STAT_KEYS = {"factorizations", "refactorizations", "refactor_fallbacks", "min_rcond", "fill"}
+
+
+def test_diagnostics_report_solver_statistics():
+    d = simulate(model(SADDLE + "simulate(T=2, N=4);"), solver="superlu").diagnostics
+    assert d.keys() >= _STAT_KEYS
+    assert d["factorizations"] == 1  # linear model: one Newton step, one factor
+    assert d["refactorizations"] == 0
+    assert d["refactor_fallbacks"] == 0
+
+
+def test_factorisation_is_reused_warm_across_segments():
+    # SURPRISE is two linear segments: segment 0 factors, segment 1 warm-starts
+    # with a refactor reusing the pivot order — no re-pivot fallback.
+    d = simulate(model(SURPRISE), solver="superlu").diagnostics
+    assert d["segments"] == 2
+    assert d["factorizations"] == 1
+    assert d["refactorizations"] == 1
+    assert d["refactor_fallbacks"] == 0
+
+
+def test_superlu_reports_fill_but_no_rcond():
+    d = simulate(model(SURPRISE), solver="superlu").diagnostics
+    assert d["min_rcond"] is None  # SuperLU exposes no cheap estimate
+    assert isinstance(d["fill"], int) and d["fill"] > 0
+
+
+@pytest.mark.skipif("klu" not in available_solvers(), reason="libklu.so not available")
+def test_klu_reports_rcond_over_the_run():
+    d = simulate(model(SURPRISE), solver="klu").diagnostics
+    assert d["min_rcond"] is not None and 0.0 < d["min_rcond"] <= 1.0
+
+
+def test_solve_pf_diagnostics_carry_solver_statistics():
+    d = solve_pf(model(SADDLE), horizon=2.0, intervals=4, solver="superlu").diagnostics
+    assert d.keys() >= _STAT_KEYS
+    assert d["factorizations"] == 1 and d["refactorizations"] == 0
+
+
 # --- cross-checks: every available backend agrees with superlu -------------
 
 

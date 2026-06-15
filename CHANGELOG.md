@@ -46,6 +46,13 @@ follows [Semantic Versioning](https://semver.org).
   package is importable (probed without importing it, so the MKL load is
   not paid unless PARDISO is actually used). Both remain non-default —
   `auto` prefers KLU for one-step schemes.
+- Enrich the run diagnostics with per-solver statistics (a `SolveStats`
+  accumulator): counts of full `factorizations` versus cheap
+  `refactorizations`, the number of `refactor_fallbacks` (safety
+  re-pivots), the worst `min_rcond` over the run, and the factorisation
+  `fill` (`nnz(L) + nnz(U)`, where the backend exposes it — SuperLU and
+  UMFPACK). The orchestrator's per-run log line now reports the
+  factor/refactor split.
 
 ## [0.0.1] — 2026-05-23
 

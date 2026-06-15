@@ -133,6 +133,10 @@ class SuperluSolver:
     def rcond(self, num: Any) -> float | None:
         return None
 
+    def nnz(self, num: tuple[Any, np.ndarray]) -> int:
+        lu, _ = num
+        return int(lu.L.nnz + lu.U.nnz)
+
 
 class _KluSym:
     """KLU symbolic data: the native analysis plus the (constant) CSC pattern."""
@@ -233,14 +237,15 @@ class _UmfpackSym:
 
 
 class _UmfpackNum:
-    """UMFPACK numeric data: the factorised context, its matrix, and rcond."""
+    """UMFPACK numeric data: the factorised context, its matrix, rcond and fill."""
 
-    __slots__ = ("ctx", "a", "rcond")
+    __slots__ = ("ctx", "a", "rcond", "fill")
 
-    def __init__(self, ctx: Any, a: csc_matrix, rcond: float | None):
+    def __init__(self, ctx: Any, a: csc_matrix, rcond: float | None, fill: int | None):
         self.ctx = ctx
         self.a = a
         self.rcond = rcond
+        self.fill = fill
 
 
 class UmfpackSolver:
@@ -267,8 +272,10 @@ class UmfpackSolver:
 
         m = _umfpack_matrix(a)
         sym.ctx.numeric(m)  # reuses the stored symbolic analysis
-        rcond = float(sym.ctx.info[umfpack.UMFPACK_RCOND])
-        return _UmfpackNum(sym.ctx, m, rcond)
+        info = sym.ctx.info
+        rcond = float(info[umfpack.UMFPACK_RCOND])
+        fill = int(info[umfpack.UMFPACK_LNZ] + info[umfpack.UMFPACK_UNZ])
+        return _UmfpackNum(sym.ctx, m, rcond, fill)
 
     def refactor(self, a: csc_matrix, sym: _UmfpackSym, num: _UmfpackNum) -> _UmfpackNum:
         return self.factor(a, sym)  # the numeric phase already reuses the symbolic
@@ -280,6 +287,9 @@ class UmfpackSolver:
 
     def rcond(self, num: _UmfpackNum) -> float | None:
         return num.rcond
+
+    def nnz(self, num: _UmfpackNum) -> int | None:
+        return num.fill
 
 
 class _PardisoNum:

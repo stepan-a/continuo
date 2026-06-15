@@ -21,6 +21,7 @@ builds on it.
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 
 import casadi as ca
@@ -46,12 +47,38 @@ from continuo.solve.linsolve import LinearSolver, SuperluSolver, select_solver
 from continuo.solve.numeric import constant_table, eval_constant
 from continuo.solve.steady import evaluate_parameters, steady_state
 
-__all__ = ["solve_pf", "solve_segment", "initial_conditions"]
+__all__ = ["solve_pf", "solve_segment", "initial_conditions", "SolveStats"]
 
 _TOL = 1e-10
 _MAX_ITER = 50
 _LINE_SEARCH_STEPS = 30
 _RCOND_FLOOR = 1e-12  # reuse the cheap refactor until conditioning drops below this
+
+
+@dataclass
+class SolveStats:
+    """Per-run linear-solver statistics, accumulated across Newton steps and segments.
+
+    ``refactor_fallbacks`` counts the safety re-pivots — a reused factorisation
+    that failed and was redone from scratch. ``min_rcond`` is the worst
+    reciprocal-condition estimate seen (``None`` when the backend gives none),
+    and ``fill`` is the latest ``nnz(L) + nnz(U)`` (``None`` when unavailable).
+    """
+
+    factorizations: int = 0
+    refactorizations: int = 0
+    refactor_fallbacks: int = 0
+    min_rcond: float | None = None
+    fill: int | None = None
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "factorizations": self.factorizations,
+            "refactorizations": self.refactorizations,
+            "refactor_fallbacks": self.refactor_fallbacks,
+            "min_rcond": self.min_rcond,
+            "fill": self.fill,
+        }
 
 
 def solve_pf(
@@ -87,6 +114,7 @@ def solve_pf(
     def constant_exogenous(_t: float) -> dict[str, float]:
         return e
 
+    stats = SolveStats()
     path, iterations, _sym, _num = solve_segment(
         model,
         residual,
@@ -97,6 +125,7 @@ def solve_pf(
         terminal_jumps=terminal_jumps,
         guess=guess,
         solver=linear,
+        stats=stats,
         tol=tol,
         max_iter=max_iter,
     )
@@ -117,6 +146,7 @@ def solve_pf(
             "segments": 1,
             "newton_iterations": iterations,
             "solver": linear.name,
+            **stats.as_dict(),
         },
     )
 
@@ -134,6 +164,7 @@ def solve_segment(
     solver: LinearSolver | None = None,
     sym: Any = None,
     num: Any = None,
+    stats: SolveStats | None = None,
     tol: float = _TOL,
     max_iter: int = _MAX_ITER,
 ) -> tuple[np.ndarray, int, Any, Any]:
@@ -149,6 +180,7 @@ def solve_segment(
     caller solving a sequence of segments can pass the ``sym`` (symbolic
     analysis) and ``num`` (factorisation, to warm-start the pivots) returned
     here back in to skip re-analysing; when ``sym`` is ``None`` it is computed.
+    ``stats`` accumulates linear-solver diagnostics in place across segments.
     """
     solver = solver or SuperluSolver()
     theta_dm = _vector(theta[name] for name in model.parameters)
@@ -158,7 +190,9 @@ def solve_segment(
     x0 = guess.reshape(-1).astype(float)
     if sym is None:
         sym = solver.analyze(_to_csc(jacobian_fn(x0)))
-    x, iterations, num = _newton(residual_fn, jacobian_fn, x0, tol, max_iter, solver, sym, num)
+    x, iterations, num = _newton(
+        residual_fn, jacobian_fn, x0, tol, max_iter, solver, sym, num, stats
+    )
     return x.reshape(grid.intervals + 1, len(model.endogenous)), iterations, sym, num
 
 
@@ -241,13 +275,16 @@ def _newton(
     solver: LinearSolver,
     sym: Any,
     num: Any = None,
+    stats: SolveStats | None = None,
 ) -> tuple[np.ndarray, int, Any]:
     """Run Newton, returning ``(x, iterations, num)``.
 
     ``num`` may carry a factorisation from a previous segment (same sparsity
     pattern) to warm-start the pivots; the final factorisation is returned so
-    the caller can carry it forward in turn.
+    the caller can carry it forward in turn. ``stats`` accumulates linear-solver
+    diagnostics in place.
     """
+    stats = stats if stats is not None else SolveStats()
 
     def norm(z: np.ndarray) -> float:
         value = np.linalg.norm(np.array(residual_fn(z)).reshape(-1), np.inf)
@@ -258,7 +295,7 @@ def _newton(
         current = np.linalg.norm(g, np.inf)
         if current < tol:
             return x, iteration - 1, num
-        num = _refresh(solver, _to_csc(jacobian_fn(x)), sym, num)
+        num = _refresh(solver, _to_csc(jacobian_fn(x)), sym, num, stats)
         step = solver.solve(num, -g)
         if not np.all(np.isfinite(step)):
             raise SolveError("singular Jacobian in the perfect-foresight solve")
@@ -268,19 +305,36 @@ def _newton(
     )
 
 
-def _refresh(solver: LinearSolver, a: csc_matrix, sym: Any, num: Any) -> Any:
+def _refresh(solver: LinearSolver, a: csc_matrix, sym: Any, num: Any, stats: SolveStats) -> Any:
     """Refresh the numeric factorisation: a cheap refactor when safe, else a full factor.
 
     Reuses the pivot order (``refactor``) on a healthy factorisation, but falls
     back to a full ``factor`` for the first step, when conditioning degrades, or
-    when a refactor with stale pivots fails (e.g. a KLU zero pivot).
+    when a refactor with stale pivots fails (e.g. a KLU zero pivot). Records the
+    work and the resulting conditioning / fill in ``stats``.
     """
     if num is None or _degraded(solver.rcond(num)):
-        return solver.factor(a, sym)
-    try:
-        return solver.refactor(a, sym, num)
-    except SolveError:
-        return solver.factor(a, sym)
+        num = solver.factor(a, sym)
+        stats.factorizations += 1
+    else:
+        try:
+            num = solver.refactor(a, sym, num)
+            stats.refactorizations += 1
+        except SolveError:  # stale pivots: redo a full factorisation
+            num = solver.factor(a, sym)
+            stats.factorizations += 1
+            stats.refactor_fallbacks += 1
+    rcond = solver.rcond(num)
+    if rcond is not None:
+        stats.min_rcond = rcond if stats.min_rcond is None else min(stats.min_rcond, rcond)
+    stats.fill = _fill(solver, num)
+    return num
+
+
+def _fill(solver: LinearSolver, num: Any) -> int | None:
+    """The factorisation's ``nnz(L) + nnz(U)`` when the backend exposes it."""
+    reporter = getattr(solver, "nnz", None)
+    return reporter(num) if reporter is not None else None
 
 
 def _degraded(rcond: float | None) -> bool:

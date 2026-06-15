@@ -38,7 +38,7 @@ from continuo.solve.disc import uniform_grid
 from continuo.solve.errors import SolveError
 from continuo.solve.linsolve import LinearSolver, select_solver
 from continuo.solve.numeric import constant_table, eval_constant
-from continuo.solve.pf import initial_conditions, solve_segment
+from continuo.solve.pf import SolveStats, initial_conditions, solve_segment
 from continuo.solve.steady import evaluate_parameters, steady_state
 
 __all__ = ["simulate"]
@@ -88,6 +88,7 @@ def simulate(
     # carried forward to warm-start each segment's first Newton step.
     sym: object | None = None
     num: object | None = None
+    stats = SolveStats()
 
     for s, start_index in enumerate(starts):
         end_index = starts[s + 1] if s + 1 < len(starts) else intervals + 1
@@ -116,6 +117,7 @@ def simulate(
             solver=linear,
             sym=sym,
             num=num,
+            stats=stats,
         )
 
         realised = end_index - start_index
@@ -138,12 +140,18 @@ def simulate(
         "segments": len(segments),
         "newton_iterations": sum(segment.iterations for segment in segments),
         "solver": linear.name,
+        **stats.as_dict(),
     }
     logger.info(
-        "simulated %d segment(s), %d Newton iteration(s) total (%s)",
+        "simulated %d segment(s), %d Newton iteration(s) total (%s); "
+        "%s: %d factor(s), %d refactor(s)%s",
         diagnostics["segments"],
         diagnostics["newton_iterations"],
         diagnostics["scheme"],
+        linear.name,
+        stats.factorizations,
+        stats.refactorizations,
+        f", {stats.refactor_fallbacks} fallback(s)" if stats.refactor_fallbacks else "",
     )
     return Solution(tuple(segments), model.endogenous, diagnostics)
 
