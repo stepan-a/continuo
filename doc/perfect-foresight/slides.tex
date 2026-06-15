@@ -1261,9 +1261,9 @@ first, then the $N{+}1$ algebraic blocks, then the two boundary rows —
 $J$ is \textbf{not} a single banded matrix: an upper-bidiagonal dynamic
 stripe (block-row $i$ touches $x_i,x_{i+1}$) on top of a diagonal
 algebraic stripe, closed by boundary entries pinning $x_0,x_N$.
-Non-zeros $O(n^2 N)$; each Newton step (next slide) hands this sparse
-$J$ to a sparse direct solver that exploits the structure, so the solve
-stays linear in $N$.
+Non-zeros $O(n^2 N)$. The two-point coupling makes $J$
+\textbf{block-triangular} after a permutation — KLU\,+\,BTF resolves it in a
+single sweep (next slides), keeping the solve linear in $N$.
 
 \end{frame}
 
@@ -1278,9 +1278,10 @@ stays linear in $N$.
   then update $X^{(k+1)} = X^{(k)} + \alpha\,\Delta X$ with a
   step $\alpha\in(0,1]$.\newline
 
-\item In Continuo: SciPy's \texttt{spsolve} (sparse LU, SuperLU by
-  default), CasADi-supplied exact sparse Jacobian, $\|G\|_\infty$
-  convergence criterion ($10^{-10}$), max 50 iterations.\newline
+\item In Continuo: a \textbf{pluggable} sparse solver (default
+  \texttt{klu}+BTF, SuperLU fallback — see next slides), a CasADi-supplied
+  exact sparse Jacobian, $\|G\|_\infty$ convergence criterion ($10^{-10}$),
+  max 50 iterations.\newline
 
 \item A simple \textbf{backtracking line search} halves $\alpha$ until
   $\|G(X^{(k+1)})\|_\infty < \|G(X^{(k)})\|_\infty$, which prevents
@@ -1290,6 +1291,135 @@ stays linear in $N$.
   replicated at every grid point. For mildly non-linear models this is
   enough; for harder problems one can warm-start from a coarser grid
   or from a homotopy.
+
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Stacked system -- The linear core}
+
+\begin{itemize}
+
+\item Every Newton step solves one sparse system $J\,\Delta X = -G$. The
+  \textbf{sparsity pattern of $J$ is constant} — across Newton iterations,
+  and (at a fixed grid) across the segments of a multi-segment run.\newline
+
+\item So the \textbf{symbolic} work (fill-reducing ordering, block structure)
+  is done \emph{once} and only the \textbf{numeric} factorisation is
+  refreshed. Continuo exposes this as a pluggable interface,
+  \[
+  \texttt{analyze} \;\to\; \texttt{factor} \;\to\; \texttt{refactor}
+  \;\to\; \texttt{solve},
+  \]
+  with \texttt{analyze} hoisted out of the loop, so each step is just
+  \texttt{refactor + solve}.\newline
+
+\item Backends: \texttt{superlu} (SciPy, always available — the fallback),
+  \texttt{klu} (SuiteSparse, the \textbf{default}), \texttt{umfpack},
+  \texttt{pardiso}; selected by \texttt{auto} unless pinned.
+
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Stacked system -- Block-triangular form (BTF)}
+
+\begin{center}
+\begin{tikzpicture}[scale=0.9]
+  % --- LEFT: J as assembled, seen as a generic sparse matrix ------------
+  \draw[thick,darkblue] (0,0) rectangle (2.5,2.5);
+  % diagonal (blue)
+  \fill[darkblue!55] (0,2) rectangle (0.5,2.5);
+  \fill[darkblue!55] (0.5,1.5) rectangle (1,2);
+  \fill[darkblue!55] (1,1) rectangle (1.5,1.5);
+  \fill[darkblue!55] (1.5,0.5) rectangle (2,1);
+  \fill[darkblue!55] (2,0) rectangle (2.5,0.5);
+  % super-diagonal (blue) -- CN couples x_i, x_{i+1}
+  \fill[darkblue!55] (0.5,2) rectangle (1,2.5);
+  \fill[darkblue!55] (1,1.5) rectangle (1.5,2);
+  \fill[darkblue!55] (1.5,1) rectangle (2,1.5);
+  \fill[darkblue!55] (2,0.5) rectangle (2.5,1);
+  % boundary entry, below the diagonal (red)
+  \fill[darkred!55] (0,0) rectangle (0.5,0.5);
+  % fill-in a generic LU would create (faded red)
+  \fill[darkred!18] (0,1) rectangle (0.5,1.5);
+  \fill[darkred!18] (0.5,0.5) rectangle (1,1);
+  \fill[darkred!18] (1,0) rectangle (1.5,0.5);
+  \node[below,align=center,font=\scriptsize] at (1.25,-0.15)
+    {as assembled\\generic LU: ordering\,+\,\textcolor{darkred}{fill-in}};
+
+  % --- arrow ------------------------------------------------------------
+  \draw[->,>=stealth,very thick,darkblue] (2.8,1.25) -- (4.7,1.25)
+    node[midway,above,font=\scriptsize]{BTF};
+
+  % --- RIGHT: after BTF, block lower-triangular -------------------------
+  \draw[thick,darkblue] (5,0) rectangle (7.5,2.5);
+  % diagonal blocks (green) -- the only ones LU-factorised
+  \fill[darkgreen!55] (5,2) rectangle (5.5,2.5);
+  \fill[darkgreen!55] (5.5,1.5) rectangle (6,2);
+  \fill[darkgreen!55] (6,1) rectangle (6.5,1.5);
+  \fill[darkgreen!55] (6.5,0.5) rectangle (7,1);
+  \fill[darkgreen!55] (7,0) rectangle (7.5,0.5);
+  % sub-diagonal coupling (blue) -- resolved by substitution
+  \fill[darkblue!45] (5,1.5) rectangle (5.5,2);
+  \fill[darkblue!45] (5.5,1) rectangle (6,1.5);
+  \fill[darkblue!45] (6,0.5) rectangle (6.5,1);
+  \fill[darkblue!45] (6.5,0) rectangle (7,0.5);
+  \draw[->,>=stealth,darkgreen] (7.75,2.3) -- (7.75,0.2);
+  \node[right,font=\scriptsize,darkgreen] at (7.8,1.25){sweep};
+  \node[below,align=center,font=\scriptsize] at (6.25,-0.15)
+    {after BTF\\block-triangular:\\\textcolor{darkgreen}{diagonal} blocks\,+\,one sweep};
+\end{tikzpicture}
+\end{center}
+
+\begin{itemize}
+
+\item The two-point CN stencil couples only neighbours $(x_i,x_{i+1})$, and
+  the boundary data is \textbf{split} ($x_0$ states, $x_N$ jumps). The
+  dependency graph is therefore \textbf{acyclic}: $J$ permutes to
+  \textbf{block-triangular} form.\newline
+
+\item \textbf{BTF} (a maximum transversal plus strongly-connected components)
+  finds that permutation automatically; KLU then LU-factorises only the small
+  $n\times n$ \textbf{diagonal blocks} and resolves the coupling by
+  \textbf{back-substitution} — one sweep, with \emph{no fill}.
+
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Stacked system -- Why KLU+BTF here}
+
+A generic sparse LU (SuperLU, UMFPACK) ignores this structure: it pays for a
+fill-reducing ordering and a full factorisation. On the real example
+Jacobians, the warm per-iteration solve (\texttt{refactor+solve}) is about
+\textbf{$7\times$ faster} with KLU\,+\,BTF:
+
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{lccc}
+  \toprule
+  model ($n$) & SuperLU & KLU\,+\,BTF & speed-up \\
+  \midrule
+  rbc ($1004$)          & $281$ & $39$  & $7.2\times$ \\
+  nk-nonlinear ($3005$) & $463$ & $62$  & $7.5\times$ \\
+  goodwin ($4802$)      & $830$ & $107$ & $7.8\times$ \\
+  \bottomrule
+\end{tabular}
+\end{center}
+\centerline{\scriptsize $\mu$s; UMFPACK $\approx$ SuperLU, PARDISO far slower at this $K$.}
+
+\medskip
+
+\begin{itemize}
+
+\item \textbf{Why ``in this context''?} BTF wins because Crank--Nicolson is a
+  \textbf{one-step} scheme. A \textbf{multi-step} scheme (BDF, 3-point — like
+  Dynare) gives a \emph{banded but not triangular} Jacobian: BTF buys nothing
+  (and can even slow it down), and a \textbf{banded} solver is the right tool.
+  Hence the pluggable interface, with \texttt{auto} routing by the scheme's
+  stencil: one-step $\to$ KLU\,+\,BTF, multi-step $\to$ banded.
 
 \end{itemize}
 
@@ -1343,7 +1473,7 @@ stays linear in $N$.
   Discr. error & none & $O(dt^2)$ globally \\
   Stencil per eqn. & 3 points ($t{-}1,t,t{+}1$) & 2 points ($t_i,t_{i+1}$) \\
   Jacobian & block tridiagonal & block bidiagonal + block diagonal \\
-  Default solver & sparse direct (UMFPACK) & SciPy \texttt{spsolve} (SuperLU) \\
+  Default solver & sparse direct (UMFPACK) & KLU\,+\,BTF (auto), SuperLU fallback \\
   Boundary data & $y_0$, $\bar y_{T+1}$ for all & $x_S(0)$, $\bar x_J(T)$ split by type \\
   Algebraic vars & like any equation & detected, enforced pointwise \\
   Symbolic engine & custom C preprocessor & CasADi (Python) \\
