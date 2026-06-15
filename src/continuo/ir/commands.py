@@ -27,6 +27,7 @@ from continuo.parser.ast import (
     NumberLit,
     SimulateCommand,
     SteadyCommand,
+    StringLit,
     UnaryOp,
 )
 
@@ -36,6 +37,10 @@ __all__ = ["attach_commands"]
 # in the solver yet); validating against the set catches typos.
 _SCHEMES = {"crank_nicolson", "radau", "sdirk", "lobatto_iiia"}
 _DEFAULT_SCHEME = "crank_nicolson"
+
+# Linear-solver presets the directive recognises (mirrors solve.SOLVERS plus
+# "auto"); whether a named backend is actually available is checked at solve time.
+_SOLVERS = {"auto", "superlu", "klu", "klu-nobtf", "umfpack", "pardiso"}
 
 
 def attach_commands(model: Model, model_file: ModelFile) -> Model:
@@ -62,14 +67,19 @@ def attach_commands(model: Model, model_file: ModelFile) -> Model:
 def _simulate(cmd: SimulateCommand) -> Simulation:
     if cmd.args:
         raise IRError("simulate takes keyword arguments only (T=…, N=…)", cmd.pos)
-    options = _collect(cmd.kwargs, allowed=("T", "N", "scheme"), what="simulate")
+    options = _collect(cmd.kwargs, allowed=("T", "N", "scheme", "solver"), what="simulate")
     if "T" not in options:
         raise IRError("simulate requires the horizon T", cmd.pos)
     if "N" not in options:
         raise IRError("simulate requires the grid resolution N", cmd.pos)
     _check_positive("T", options["T"], integer=False)
     _check_positive("N", options["N"], integer=True)
-    return Simulation(options["T"], options["N"], _scheme(options.get("scheme")))
+    return Simulation(
+        options["T"],
+        options["N"],
+        _scheme(options.get("scheme")),
+        _solver(options.get("solver")),
+    )
 
 
 def _scheme(value: Expr | None) -> str:
@@ -87,6 +97,27 @@ def _scheme(value: Expr | None) -> str:
             value.pos,
         )
     return value.name
+
+
+def _solver(value: Expr | None) -> str | None:
+    """A solver preset named as a bare identifier or a string (for ``klu-nobtf``)."""
+    if value is None:
+        return None
+    if isinstance(value, Identifier):
+        name = value.name
+    elif isinstance(value, StringLit):
+        name = value.value
+    else:
+        raise IRError(
+            "simulate solver must be a solver name (e.g. solver=klu)",
+            getattr(value, "pos", None),
+        )
+    if name not in _SOLVERS:
+        raise IRError(
+            f"unknown linear solver {name!r}; expected one of {', '.join(sorted(_SOLVERS))}",
+            getattr(value, "pos", None),
+        )
+    return name
 
 
 def _check_positive(name: str, expr: Expr, *, integer: bool) -> None:

@@ -39,6 +39,24 @@ def test_simulate_scheme_override():
     assert m.simulations[0].scheme == "radau"
 
 
+def test_simulate_solver_defaults_to_none():
+    assert ir("simulate(T=200, N=400);").simulations[0].solver is None
+
+
+def test_simulate_solver_directive_as_identifier():
+    assert ir("simulate(T=200, N=400, solver=klu);").simulations[0].solver == "klu"
+
+
+def test_simulate_solver_directive_as_string_for_dashed_preset():
+    m = ir('simulate(T=200, N=400, solver="klu-nobtf");')
+    assert m.simulations[0].solver == "klu-nobtf"
+
+
+def test_simulate_rejects_unknown_solver():
+    with pytest.raises(IRError, match="unknown linear solver 'magic'"):
+        ir("simulate(T=200, N=400, solver=magic);")
+
+
 def test_no_command_leaves_empty():
     m = ir()
     assert m.simulations == ()

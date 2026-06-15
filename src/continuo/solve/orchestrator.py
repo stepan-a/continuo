@@ -68,7 +68,9 @@ def simulate(
     :class:`LinearSolver` instance, or the ``"auto"`` default).
     """
     theta = evaluate_parameters(model)
-    horizon, intervals, scheme = _resolve_command(model, theta, horizon, intervals, scheme)
+    horizon, intervals, scheme, solver = _resolve_command(
+        model, theta, horizon, intervals, scheme, solver
+    )
     if scheme != _SUPPORTED_SCHEME:
         raise SolveError(f"discretisation scheme {scheme!r} is not implemented yet")
     # One backend for the whole run; auto routes by the scheme's coupling stencil.
@@ -167,16 +169,19 @@ def _resolve_command(
     horizon: float | None,
     intervals: int | None,
     scheme: str | None,
-) -> tuple[float, int, str]:
+    solver: str | LinearSolver | None,
+) -> tuple[float, int, str, str | LinearSolver | None]:
+    # Precedence for scheme/solver: explicit argument > simulate directive > default.
     if horizon is not None and intervals is not None:
-        return float(horizon), int(intervals), scheme or _SUPPORTED_SCHEME
+        return float(horizon), int(intervals), scheme or _SUPPORTED_SCHEME, solver
     if not model.simulations:
         raise SolveError("no simulate command in the model; pass horizon and intervals")
     command = model.simulations[0]
     table = constant_table(theta, {}, model)
     t = eval_constant(command.horizon, table, what="simulate horizon T")
     n = eval_constant(command.grid, table, what="simulate grid N")
-    return float(t), int(n), scheme or command.scheme
+    chosen_solver = solver if solver is not None else command.solver
+    return float(t), int(n), scheme or command.scheme, chosen_solver
 
 
 def _schedule(

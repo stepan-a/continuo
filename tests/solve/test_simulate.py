@@ -282,6 +282,22 @@ def test_solve_pf_records_the_solver():
     assert sol.diagnostics["solver"] == "superlu"
 
 
+def test_solver_directive_is_honoured():
+    # The directive picks the backend when no argument is passed (the default
+    # auto would otherwise prefer klu here).
+    src = SADDLE + "simulate(T=2, N=4, solver=superlu);"
+    assert simulate(model(src)).diagnostics["solver"] == "superlu"
+
+
+def test_explicit_solver_argument_overrides_the_directive():
+    # Precedence: argument (CLI / API) > simulate directive. A concrete instance
+    # passed as the argument wins over a directive naming another backend.
+    from continuo.solve import SuperluSolver
+
+    src = SADDLE + "simulate(T=2, N=4, solver=klu);"
+    assert simulate(model(src), solver=SuperluSolver()).diagnostics["solver"] == "superlu"
+
+
 def test_symbolic_analysis_is_reused_across_segments(monkeypatch):
     # The stacked pattern is constant across segments, so the orchestrator
     # analyses once and reuses it; a per-segment analyse would call this twice.

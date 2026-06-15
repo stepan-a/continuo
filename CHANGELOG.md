@@ -53,6 +53,10 @@ follows [Semantic Versioning](https://semver.org).
   `fill` (`nnz(L) + nnz(U)`, where the backend exposes it — SuperLU and
   UMFPACK). The orchestrator's per-run log line now reports the
   factor/refactor split.
+- Accept a `solver=` option on the `simulate` directive, e.g.
+  `simulate(T=50, N=250, solver=klu);` (or `solver="klu-nobtf"` for the
+  dashed preset). Unknown names are rejected at validation. Precedence is
+  explicit argument (API / CLI) > directive > `auto`.
 
 ## [0.0.1] — 2026-05-23
 

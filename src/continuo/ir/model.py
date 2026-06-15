@@ -40,11 +40,16 @@ class Shock:
 
 @dataclass(frozen=True)
 class Simulation:
-    """A perfect-foresight run: horizon T, grid intervals N, and the scheme."""
+    """A perfect-foresight run: horizon T, grid intervals N, scheme, and solver.
+
+    ``solver`` is the linear-solver preset named in the directive (``None``
+    when unspecified, leaving the choice to ``auto`` / the caller).
+    """
 
     horizon: Expr
     grid: Expr
     scheme: str
+    solver: str | None = None
 
 
 @dataclass(frozen=True)
