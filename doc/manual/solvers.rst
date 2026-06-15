@@ -132,6 +132,17 @@ The backends
    systems continuo usually produces. Install with the ``pardiso`` extra
    (pulls in MKL). Install both optional backends with ``solvers``.
 
+   .. note::
+
+      On the small systems here PARDISO is far slower than KLU (see the
+      benchmarks below), and that is **not** mainly an AMD-vs-Intel MKL
+      effect: forcing ``MKL_ENABLE_INSTRUCTIONS=AVX512`` gives no consistent
+      speed-up, whereas ``MKL_NUM_THREADS=1`` roughly *halves* the time —
+      MKL oversubscribes threads on a problem far too small to parallelise,
+      and even single-threaded it stays an order of magnitude behind KLU.
+      Reserve PARDISO for large models, and cap ``MKL_NUM_THREADS`` when the
+      systems are small.
+
 See :doc:`installation` for the extras.
 
 Fine control
@@ -178,7 +189,9 @@ Benchmarks
 
 The tables below compare the available backends across the example models
 (end-to-end ``Model.simul()`` wall-clock and peak resident memory).
-Regenerate them with ``python examples/benchmark_solvers.py --write``.
+Regenerate them with ``python examples/benchmark_solvers.py --write``. The
+PARDISO figures are at MKL's default threading; on these small systems that
+oversubscribes and inflates its numbers (see the note above).
 
 .. BENCHMARK START
 
