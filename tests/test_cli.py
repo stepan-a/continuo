@@ -59,6 +59,19 @@ def test_horizon_and_grid_overrides(tmp_path):
     assert float(rows[-1][0]) == pytest.approx(2.0)
 
 
+def test_solver_flag_selects_a_backend(tmp_path):
+    model = write_model(tmp_path)
+    assert main([str(model), "--solver", "superlu"]) == 0
+    assert (tmp_path / "model.csv").exists()
+
+
+def test_unknown_solver_flag_reports_error(tmp_path, capsys):
+    # A bogus --solver only errors if the flag is actually threaded through.
+    model = write_model(tmp_path)
+    assert main([str(model), "--solver", "bogus"]) == 1
+    assert "bogus" in capsys.readouterr().err
+
+
 def test_missing_file_reports_error(tmp_path, capsys):
     assert main([str(tmp_path / "nope.mod")]) == 1
     assert "cannot read" in capsys.readouterr().err

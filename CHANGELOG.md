@@ -57,6 +57,8 @@ follows [Semantic Versioning](https://semver.org).
   `simulate(T=50, N=250, solver=klu);` (or `solver="klu-nobtf"` for the
   dashed preset). Unknown names are rejected at validation. Precedence is
   explicit argument (API / CLI) > directive > `auto`.
+- Add a `--solver` flag to the `continuo` CLI
+  (`continuo model.mod --solver klu`), overriding the directive.
 
 ## [0.0.1] — 2026-05-23
 

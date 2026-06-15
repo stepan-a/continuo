@@ -33,7 +33,7 @@ def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
     try:
         model = parse(args.model)
-        solution = model.simul(horizon=args.horizon, intervals=args.intervals)
+        solution = model.simul(horizon=args.horizon, intervals=args.intervals, solver=args.solver)
     except _ERRORS as exc:
         print(f"continuo: error: {exc}", file=sys.stderr)
         return 1
@@ -56,6 +56,11 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("-o", "--output", help="output CSV file (default: <model>.csv)")
     parser.add_argument("-T", "--horizon", type=float, help="override the simulation horizon T")
     parser.add_argument("-N", "--intervals", type=int, help="override the grid resolution N")
+    parser.add_argument(
+        "--solver",
+        help="linear solver backend, overriding the simulate directive "
+        "(e.g. auto, superlu, klu, klu-nobtf, umfpack, pardiso)",
+    )
     return parser.parse_args(argv)
 
 
