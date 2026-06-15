@@ -45,6 +45,10 @@ __all__ = ["simulate"]
 
 _SUPPORTED_SCHEME = "crank_nicolson"
 
+# Coupling stencil each scheme generates, which guides ``solver="auto"``:
+# one-step schemes (CN, collocation/IRK) yield a block-triangular Jacobian.
+_STENCIL = {"crank_nicolson": "one-step"}
+
 logger = logging.getLogger(__name__)
 
 
@@ -67,7 +71,8 @@ def simulate(
     horizon, intervals, scheme = _resolve_command(model, theta, horizon, intervals, scheme)
     if scheme != _SUPPORTED_SCHEME:
         raise SolveError(f"discretisation scheme {scheme!r} is not implemented yet")
-    linear = select_solver(solver)  # one backend for the whole run (constant pattern)
+    # One backend for the whole run; auto routes by the scheme's coupling stencil.
+    linear = select_solver(solver, stencil=_STENCIL[scheme])
 
     residual = build_residual(model)
     dt = horizon / intervals
@@ -78,6 +83,11 @@ def simulate(
     index = {name: k for k, name in enumerate(model.endogenous)}
     segments: list[Segment] = []
     carried: dict[str, float] | None = None
+    # The stacked Jacobian's pattern is identical across segments (same grid),
+    # so the symbolic analysis is done once and reused; the factorisation is
+    # carried forward to warm-start each segment's first Newton step.
+    sym: object | None = None
+    num: object | None = None
 
     for s, start_index in enumerate(starts):
         end_index = starts[s + 1] if s + 1 < len(starts) else intervals + 1
@@ -94,7 +104,7 @@ def simulate(
         terminal_jumps = {name: terminal_ss[name] for name in model.jumps}
         guess = np.tile([terminal_ss[name] for name in model.endogenous], (intervals + 1, 1))
 
-        segment_path, iterations = solve_segment(
+        segment_path, iterations, sym, num = solve_segment(
             model,
             residual,
             grid,
@@ -104,6 +114,8 @@ def simulate(
             terminal_jumps=terminal_jumps,
             guess=guess,
             solver=linear,
+            sym=sym,
+            num=num,
         )
 
         realised = end_index - start_index

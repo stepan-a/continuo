@@ -87,7 +87,7 @@ def solve_pf(
     def constant_exogenous(_t: float) -> dict[str, float]:
         return e
 
-    path, iterations = solve_segment(
+    path, iterations, _sym, _num = solve_segment(
         model,
         residual,
         grid,
@@ -132,18 +132,23 @@ def solve_segment(
     terminal_jumps: dict[str, float],
     guess: np.ndarray,
     solver: LinearSolver | None = None,
+    sym: Any = None,
+    num: Any = None,
     tol: float = _TOL,
     max_iter: int = _MAX_ITER,
-) -> tuple[np.ndarray, int]:
-    """Solve one segment numerically, returning ``(path (N+1, n), iterations)``.
+) -> tuple[np.ndarray, int, Any, Any]:
+    """Solve one segment, returning ``(path (N+1, n), iterations, sym, num)``.
 
     ``exogenous_at(t)`` gives the exogenous values at time ``t``; the
     collocation evaluates it at the interval midpoints and grid points,
     so a time-varying belief path is handled directly.
 
-    ``solver`` is the pluggable linear backend used for each Newton step;
-    it defaults to :class:`SuperluSolver`. The stacked Jacobian's pattern
-    is constant over the segment, so its symbolic phase is analysed once.
+    ``solver`` is the pluggable linear backend used for each Newton step; it
+    defaults to :class:`SuperluSolver`. The stacked Jacobian's pattern is
+    constant over the segment — and, at a fixed grid, across segments — so a
+    caller solving a sequence of segments can pass the ``sym`` (symbolic
+    analysis) and ``num`` (factorisation, to warm-start the pivots) returned
+    here back in to skip re-analysing; when ``sym`` is ``None`` it is computed.
     """
     solver = solver or SuperluSolver()
     theta_dm = _vector(theta[name] for name in model.parameters)
@@ -151,9 +156,10 @@ def solve_segment(
         model, residual, grid, theta_dm, exogenous_at, initial_states, terminal_jumps
     )
     x0 = guess.reshape(-1).astype(float)
-    sym = solver.analyze(_to_csc(jacobian_fn(x0)))
-    x, iterations = _newton(residual_fn, jacobian_fn, x0, tol, max_iter, solver, sym)
-    return x.reshape(grid.intervals + 1, len(model.endogenous)), iterations
+    if sym is None:
+        sym = solver.analyze(_to_csc(jacobian_fn(x0)))
+    x, iterations, num = _newton(residual_fn, jacobian_fn, x0, tol, max_iter, solver, sym, num)
+    return x.reshape(grid.intervals + 1, len(model.endogenous)), iterations, sym, num
 
 
 # ---------------------------------------------------------------------------
@@ -234,22 +240,25 @@ def _newton(
     max_iter: int,
     solver: LinearSolver,
     sym: Any,
-) -> tuple[np.ndarray, int]:
+    num: Any = None,
+) -> tuple[np.ndarray, int, Any]:
+    """Run Newton, returning ``(x, iterations, num)``.
+
+    ``num`` may carry a factorisation from a previous segment (same sparsity
+    pattern) to warm-start the pivots; the final factorisation is returned so
+    the caller can carry it forward in turn.
+    """
+
     def norm(z: np.ndarray) -> float:
         value = np.linalg.norm(np.array(residual_fn(z)).reshape(-1), np.inf)
         return value if np.isfinite(value) else np.inf
 
-    num: Any = None
     for iteration in range(1, max_iter + 1):
         g = np.array(residual_fn(x)).reshape(-1)
         current = np.linalg.norm(g, np.inf)
         if current < tol:
-            return x, iteration - 1
-        a = _to_csc(jacobian_fn(x))
-        if num is None or _degraded(solver.rcond(num)):
-            num = solver.factor(a, sym)  # full factorisation: first step or guard-rail
-        else:
-            num = solver.refactor(a, sym, num)  # cheap refresh reusing the pivot order
+            return x, iteration - 1, num
+        num = _refresh(solver, _to_csc(jacobian_fn(x)), sym, num)
         step = solver.solve(num, -g)
         if not np.all(np.isfinite(step)):
             raise SolveError("singular Jacobian in the perfect-foresight solve")
@@ -257,6 +266,21 @@ def _newton(
     raise SolveError(
         "perfect-foresight solve did not converge; refine the grid or supply a better initial_guess"
     )
+
+
+def _refresh(solver: LinearSolver, a: csc_matrix, sym: Any, num: Any) -> Any:
+    """Refresh the numeric factorisation: a cheap refactor when safe, else a full factor.
+
+    Reuses the pivot order (``refactor``) on a healthy factorisation, but falls
+    back to a full ``factor`` for the first step, when conditioning degrades, or
+    when a refactor with stale pivots fails (e.g. a KLU zero pivot).
+    """
+    if num is None or _degraded(solver.rcond(num)):
+        return solver.factor(a, sym)
+    try:
+        return solver.refactor(a, sym, num)
+    except SolveError:
+        return solver.factor(a, sym)
 
 
 def _degraded(rcond: float | None) -> bool:

@@ -24,7 +24,9 @@ dependency of continuo. It captures SciPy's COLAMD column ordering once in
 
 from __future__ import annotations
 
-from collections.abc import Callable
+import contextlib
+import logging
+from collections.abc import Callable, Iterator
 from typing import Any, Protocol, runtime_checkable
 
 import numpy as np
@@ -33,6 +35,8 @@ from scipy.sparse.linalg import splu
 
 from continuo.solve import _klu
 from continuo.solve.errors import SolveError
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "LinearSolver",
@@ -165,8 +169,9 @@ class KluSolver:
 
     def analyze(self, a0: csc_matrix) -> _KluSym:
         ap, ai, _ = _csc_arrays(a0)
-        common = _klu.make_common(btf=self.btf, ordering=self.ordering, scale=self.scale)
-        symbolic = _klu.analyze(ap, ai, common)
+        with _as_solve_error():
+            common = _klu.make_common(btf=self.btf, ordering=self.ordering, scale=self.scale)
+            symbolic = _klu.analyze(ap, ai, common)
         rank = symbolic.structural_rank
         if rank not in (-1, symbolic.n):  # -1 means "not computed" (btf=False)
             raise SolveError(
@@ -175,13 +180,16 @@ class KluSolver:
         return _KluSym(symbolic)
 
     def factor(self, a: csc_matrix, sym: _KluSym) -> Any:
-        return _klu.factor(_csc_arrays(a)[2], sym.symbolic)
+        with _as_solve_error():
+            return _klu.factor(_csc_arrays(a)[2], sym.symbolic)
 
     def refactor(self, a: csc_matrix, sym: _KluSym, num: Any) -> Any:
-        return _klu.refactor(_csc_arrays(a)[2], sym.symbolic, num)
+        with _as_solve_error():
+            return _klu.refactor(_csc_arrays(a)[2], sym.symbolic, num)
 
     def solve(self, num: Any, b: np.ndarray) -> np.ndarray:
-        return _klu.solve(num, np.asarray(b, dtype=float))
+        with _as_solve_error():
+            return _klu.solve(num, np.asarray(b, dtype=float))
 
     def rcond(self, num: Any) -> float | None:
         return num.rcond
@@ -197,6 +205,19 @@ def _csc_arrays(a: csc_matrix) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         a.indices.astype(np.int32, copy=False),
         a.data.astype(np.float64, copy=False),
     )
+
+
+@contextlib.contextmanager
+def _as_solve_error() -> Iterator[None]:
+    """Translate a low-level :class:`_klu.KluError` into a :class:`SolveError`.
+
+    This lets the Newton driver treat a failed KLU refactor (e.g. a stale-pivot
+    zero) uniformly and fall back to a full factor.
+    """
+    try:
+        yield
+    except _klu.KluError as exc:
+        raise SolveError(str(exc)) from exc
 
 
 # ---------------------------------------------------------------------------
@@ -225,24 +246,54 @@ def available_solvers() -> frozenset[str]:
     return frozenset(names)
 
 
+_warned_no_klu = False
+
+
+def _warn_klu_missing() -> None:
+    global _warned_no_klu
+    if not _warned_no_klu:
+        _warned_no_klu = True
+        logger.warning(
+            "KLU backend unavailable (libklu.so not found); falling back to SuperLU. "
+            "Install SuiteSparse (Debian: libsuitesparse-dev) for the faster one-step solver."
+        )
+
+
+def _auto_pick(stencil: str, available: frozenset[str]) -> str:
+    """Choose a backend for ``solver="auto"`` from the scheme's coupling stencil."""
+    if stencil == "one-step":  # block-triangular stacked Jacobian -> KLU + BTF
+        if "klu" in available:
+            return "klu"
+        _warn_klu_missing()
+        return "superlu"
+    # multi-step (banded Jacobian): prefer a banded solver, then KLU without the
+    # (useless) BTF, then SuperLU. The banded backend lands with multi-step schemes.
+    for name in ("banded", "klu-nobtf"):
+        if name in available:
+            return name
+    return "superlu"
+
+
 def select_solver(
     requested: str | LinearSolver | None,
     available: frozenset[str] | None = None,
+    *,
+    stencil: str = "one-step",
 ) -> LinearSolver:
     """Resolve a user request into a concrete :class:`LinearSolver`.
 
     ``requested`` is a preset name, an already-built solver instance (passed
     through untouched for fine control), or ``None`` / ``"auto"`` to let
-    continuo choose. Unknown or unavailable presets raise :class:`SolveError`.
+    continuo choose by the scheme's coupling ``stencil`` (``"one-step"`` routes
+    to KLU when available, falling back to SuperLU). Unknown or unavailable
+    presets raise :class:`SolveError`.
     """
     if isinstance(requested, LinearSolver):
         return requested
     available = available_solvers() if available is None else available
     name = requested or "auto"
     if name == "auto":
-        # Only one backend today; stencil-aware routing (one-step -> klu,
-        # multi-step -> banded) lands with those backends.
-        name = "superlu"
+        name = _auto_pick(stencil, available)
     if name not in SOLVERS:
         raise SolveError(f"unknown linear solver {name!r}; presets: {sorted(SOLVERS)}")
     if name not in available:

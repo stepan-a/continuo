@@ -71,9 +71,20 @@ def test_name():
 # --- select_solver --------------------------------------------------------
 
 
-def test_select_default_and_auto_resolve_to_superlu():
-    assert isinstance(select_solver(None), SuperluSolver)
-    assert isinstance(select_solver("auto"), SuperluSolver)
+def test_auto_routes_one_step_to_klu_when_available():
+    full = frozenset({"superlu", "klu", "klu-nobtf"})
+    assert select_solver("auto", full, stencil="one-step").name == "klu"
+    assert select_solver(None, full, stencil="one-step").name == "klu"
+
+
+def test_auto_falls_back_to_superlu_without_klu():
+    assert select_solver("auto", frozenset({"superlu"}), stencil="one-step").name == "superlu"
+
+
+def test_auto_routes_multi_step_to_klu_nobtf_until_a_banded_solver_exists():
+    full = frozenset({"superlu", "klu", "klu-nobtf"})
+    assert select_solver("auto", full, stencil="multi-step").name == "klu-nobtf"
+    assert select_solver("auto", frozenset({"superlu"}), stencil="multi-step").name == "superlu"
 
 
 def test_select_named_preset():

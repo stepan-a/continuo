@@ -29,9 +29,15 @@ follows [Semantic Versioning](https://semver.org).
   parameter of `KluSolver` (off for plain sparse LU), and `ordering`
   selects AMD or COLAMD. The library is detected at runtime: `klu` is
   offered only when `libklu.so` is present (Debian `libsuitesparse-dev`),
-  and a structurally singular Jacobian is reported at analysis time. The
-  selector still defaults `auto` to `superlu`; stencil-aware routing to
-  `klu` comes next.
+  and a structurally singular Jacobian is reported at analysis time.
+- Route `solver="auto"` (the default) by the scheme's coupling stencil:
+  one-step schemes (Crank–Nicolson) now pick `klu` when it is available —
+  exploiting the block-triangular stacked Jacobian — and fall back to
+  `superlu` otherwise (warning once). The multi-segment orchestrator
+  analyses the constant sparsity pattern **once** and reuses it across
+  segments, carrying the factorisation forward to warm-start each
+  segment's first Newton step (a refactor reusing the pivot order, with a
+  safe fall-back to a full factor).
 
 ## [0.0.1] — 2026-05-23
 

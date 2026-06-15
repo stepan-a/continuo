@@ -246,12 +246,15 @@ def test_solver_preset_threads_through_and_is_recorded():
     src = SADDLE + "simulate(T=2, N=4);"
     sol = simulate(model(src), solver="superlu")
     assert sol.diagnostics["solver"] == "superlu"
-    np.testing.assert_allclose(sol["x"], simulate(model(src))["x"], atol=1e-12)
+    # Matches the auto default (klu when available); both solve the same system.
+    np.testing.assert_allclose(sol["x"], simulate(model(src))["x"], atol=1e-9)
 
 
-def test_solver_auto_is_the_default():
+def test_solver_auto_is_the_default_and_routes_by_availability():
+    # crank_nicolson is a one-step scheme, so auto prefers klu when present.
     src = SADDLE + "simulate(T=2, N=4);"
-    assert simulate(model(src)).diagnostics["solver"] == "superlu"
+    expected = "klu" if "klu" in available_solvers() else "superlu"
+    assert simulate(model(src)).diagnostics["solver"] == expected
 
 
 def test_solver_instance_is_accepted():
@@ -265,7 +268,7 @@ def test_solver_instance_is_accepted():
 def test_solver_threads_through_each_segment_of_a_surprise():
     sol = simulate(model(SURPRISE), solver="superlu")
     assert len(sol.segments) == 2
-    np.testing.assert_allclose(sol["x"], simulate(model(SURPRISE))["x"], atol=1e-12)
+    np.testing.assert_allclose(sol["x"], simulate(model(SURPRISE))["x"], atol=1e-9)
 
 
 def test_unknown_solver_rejected():
@@ -277,6 +280,25 @@ def test_unknown_solver_rejected():
 def test_solve_pf_records_the_solver():
     sol = solve_pf(model(SADDLE), horizon=2.0, intervals=4, solver="superlu")
     assert sol.diagnostics["solver"] == "superlu"
+
+
+def test_symbolic_analysis_is_reused_across_segments(monkeypatch):
+    # The stacked pattern is constant across segments, so the orchestrator
+    # analyses once and reuses it; a per-segment analyse would call this twice.
+    from continuo.solve import SuperluSolver
+
+    calls = 0
+    original = SuperluSolver.analyze
+
+    def counting_analyze(self, a0):
+        nonlocal calls
+        calls += 1
+        return original(self, a0)
+
+    monkeypatch.setattr(SuperluSolver, "analyze", counting_analyze)
+    sol = simulate(model(SURPRISE), solver="superlu")
+    assert len(sol.segments) == 2
+    assert calls == 1
 
 
 # --- cross-checks: every available backend agrees with superlu -------------
@@ -299,4 +321,19 @@ def test_backend_matches_superlu_across_a_surprise(backend):
     ref = simulate(model(SURPRISE), solver="superlu")
     got = simulate(model(SURPRISE), solver=backend)
     assert len(got.segments) == 2
+    np.testing.assert_allclose(got["x"], ref["x"], atol=1e-9)
+
+
+@pytest.mark.skipif(not OPTIONAL_BACKENDS, reason="no optional backends installed")
+@pytest.mark.parametrize("backend", OPTIONAL_BACKENDS)
+def test_backend_matches_superlu_across_a_three_segment_chain(backend):
+    # Three segments exercise the orchestrator's symbolic reuse + factorisation
+    # warm-start across more than one hand-off.
+    src = (
+        TRACKER + "shocks;\n  var u;\n  path = 0;\n  path at t=5 = 1;\n  path at t=10 = 2;\nend;\n"
+        "simulate(T=20, N=200);"
+    )
+    ref = simulate(model(src), solver="superlu")
+    got = simulate(model(src), solver=backend)
+    assert len(got.segments) == 3
     np.testing.assert_allclose(got["x"], ref["x"], atol=1e-9)
