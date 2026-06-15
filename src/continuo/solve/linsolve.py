@@ -31,11 +31,13 @@ import numpy as np
 from scipy.sparse import csc_matrix
 from scipy.sparse.linalg import splu
 
+from continuo.solve import _klu
 from continuo.solve.errors import SolveError
 
 __all__ = [
     "LinearSolver",
     "SuperluSolver",
+    "KluSolver",
     "SOLVERS",
     "available_solvers",
     "select_solver",
@@ -125,25 +127,102 @@ class SuperluSolver:
         return None
 
 
+class _KluSym:
+    """KLU symbolic data: the native analysis plus the (constant) CSC pattern."""
+
+    __slots__ = ("symbolic",)
+
+    def __init__(self, symbolic: Any):
+        self.symbolic = symbolic
+
+
+class KluSolver:
+    """SuiteSparse KLU backend (``libklu.so``), the recommended one-step solver.
+
+    KLU pre-orders the matrix into block triangular form (BTF) and reuses
+    that symbolic analysis across numeric refactorisations, so the stacked
+    Jacobian of a one-step scheme — which is block-triangular — is solved by
+    block back-substitution. ``btf`` is a *parameter* applied at analyse
+    time, not a separate backend: ``btf=False`` turns KLU into a plain
+    sparse LU (useful for multi-step schemes where BTF is pure overhead).
+    ``ordering`` picks the per-block fill-reducing ordering (``"amd"`` or
+    ``"colamd"``); ``scale`` is KLU's row scaling (kept at its default when
+    ``None``).
+
+    Requires ``libklu.so`` at runtime; :func:`available_solvers` gates the
+    preset on its presence and the caller falls back to SuperLU otherwise.
+    """
+
+    def __init__(self, *, btf: bool = True, ordering: str = "amd", scale: int | None = None):
+        if ordering not in _klu.ORDERING:
+            raise SolveError(
+                f"unknown KLU ordering {ordering!r}; expected one of {sorted(_klu.ORDERING)}"
+            )
+        self.btf = btf
+        self.ordering = ordering
+        self.scale = scale
+        self.name = "klu" if btf else "klu-nobtf"
+
+    def analyze(self, a0: csc_matrix) -> _KluSym:
+        ap, ai, _ = _csc_arrays(a0)
+        common = _klu.make_common(btf=self.btf, ordering=self.ordering, scale=self.scale)
+        symbolic = _klu.analyze(ap, ai, common)
+        rank = symbolic.structural_rank
+        if rank not in (-1, symbolic.n):  # -1 means "not computed" (btf=False)
+            raise SolveError(
+                f"structurally singular Jacobian: KLU structural rank {rank} of {symbolic.n}"
+            )
+        return _KluSym(symbolic)
+
+    def factor(self, a: csc_matrix, sym: _KluSym) -> Any:
+        return _klu.factor(_csc_arrays(a)[2], sym.symbolic)
+
+    def refactor(self, a: csc_matrix, sym: _KluSym, num: Any) -> Any:
+        return _klu.refactor(_csc_arrays(a)[2], sym.symbolic, num)
+
+    def solve(self, num: Any, b: np.ndarray) -> np.ndarray:
+        return _klu.solve(num, np.asarray(b, dtype=float))
+
+    def rcond(self, num: Any) -> float | None:
+        return num.rcond
+
+
+def _csc_arrays(a: csc_matrix) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Canonical CSC ``(indptr, indices, data)`` as int32 / int32 / float64 for KLU."""
+    a = a.tocsc()
+    a.sum_duplicates()
+    a.sort_indices()
+    return (
+        a.indptr.astype(np.int32, copy=False),
+        a.indices.astype(np.int32, copy=False),
+        a.data.astype(np.float64, copy=False),
+    )
+
+
 # ---------------------------------------------------------------------------
 # registry and selection
 # ---------------------------------------------------------------------------
 
-# Preset name -> factory. Optional backends (klu, umfpack, pardiso) register
-# here as they are added; ``superlu`` is always present.
+# Preset name -> factory. Optional backends (umfpack, pardiso) register here
+# as they are added; ``superlu`` is always present.
 SOLVERS: dict[str, Callable[[], LinearSolver]] = {
     "superlu": lambda: SuperluSolver(),
+    "klu": lambda: KluSolver(btf=True),
+    "klu-nobtf": lambda: KluSolver(btf=False),
 }
 
 
 def available_solvers() -> frozenset[str]:
     """Preset names whose backend can actually run in this environment.
 
-    SciPy is a hard dependency, so ``superlu`` is always available; optional
-    backends probe their native libraries / packages and join the set in
-    later commits.
+    SciPy is a hard dependency, so ``superlu`` is always available; ``klu``
+    needs ``libklu.so`` at runtime and is gated on its presence. Other
+    optional backends probe their packages and join the set in later commits.
     """
-    return frozenset({"superlu"})
+    names = {"superlu"}
+    if _klu.is_available():
+        names |= {"klu", "klu-nobtf"}
+    return frozenset(names)
 
 
 def select_solver(

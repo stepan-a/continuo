@@ -7,7 +7,11 @@ import pytest
 
 from continuo.ir import build
 from continuo.parser import parse
-from continuo.solve import SolveError, simulate, solve_pf
+from continuo.solve import SolveError, available_solvers, simulate, solve_pf
+
+# Optional backends present in this environment, exercised by the cross-checks
+# below; superlu is always available and is the reference.
+OPTIONAL_BACKENDS = sorted(available_solvers() - {"superlu"})
 
 
 def model(src: str):
@@ -273,3 +277,26 @@ def test_unknown_solver_rejected():
 def test_solve_pf_records_the_solver():
     sol = solve_pf(model(SADDLE), horizon=2.0, intervals=4, solver="superlu")
     assert sol.diagnostics["solver"] == "superlu"
+
+
+# --- cross-checks: every available backend agrees with superlu -------------
+
+
+@pytest.mark.skipif(not OPTIONAL_BACKENDS, reason="no optional backends installed")
+@pytest.mark.parametrize("backend", OPTIONAL_BACKENDS)
+def test_backend_matches_superlu_on_a_transition(backend):
+    src = TRACKER + "shocks;\n  var u;\n  path = 2;\nend;\nsimulate(T=20, N=200);"
+    ref = simulate(model(src), solver="superlu")
+    got = simulate(model(src), solver=backend)
+    assert got.diagnostics["solver"] == backend
+    np.testing.assert_allclose(got["x"], ref["x"], atol=1e-9)
+    np.testing.assert_allclose(got["y"], ref["y"], atol=1e-9)
+
+
+@pytest.mark.skipif(not OPTIONAL_BACKENDS, reason="no optional backends installed")
+@pytest.mark.parametrize("backend", OPTIONAL_BACKENDS)
+def test_backend_matches_superlu_across_a_surprise(backend):
+    ref = simulate(model(SURPRISE), solver="superlu")
+    got = simulate(model(SURPRISE), solver=backend)
+    assert len(got.segments) == 2
+    np.testing.assert_allclose(got["x"], ref["x"], atol=1e-9)

@@ -1,4 +1,4 @@
-"""Tests for the pluggable linear-solver interface and the SuperLU backend."""
+"""Tests for the pluggable linear-solver interface and its backends."""
 
 from __future__ import annotations
 
@@ -6,8 +6,10 @@ import numpy as np
 import pytest
 from scipy.sparse import csc_matrix
 
-from continuo.solve import SolveError
-from continuo.solve.linsolve import LinearSolver, SuperluSolver, select_solver
+from continuo.solve import SolveError, _klu, available_solvers
+from continuo.solve.linsolve import KluSolver, LinearSolver, SuperluSolver, select_solver
+
+requires_klu = pytest.mark.skipif(not _klu.is_available(), reason="libklu.so not available")
 
 
 def random_system(n: int, seed: int) -> tuple[csc_matrix, np.ndarray]:
@@ -91,3 +93,77 @@ def test_select_unknown_preset_rejected():
 def test_select_unavailable_preset_rejected():
     with pytest.raises(SolveError, match="unavailable"):
         select_solver("superlu", available=frozenset())
+
+
+# --- KLU backend ----------------------------------------------------------
+
+
+@requires_klu
+def test_klu_satisfies_the_protocol():
+    assert isinstance(KluSolver(), LinearSolver)
+
+
+@requires_klu
+def test_klu_is_advertised_when_the_library_is_present():
+    assert {"klu", "klu-nobtf"} <= available_solvers()
+    assert select_solver("klu").name == "klu"
+    assert select_solver("klu-nobtf").name == "klu-nobtf"
+
+
+@requires_klu
+@pytest.mark.parametrize("btf", [True, False])
+def test_klu_solve_matches_dense(btf):
+    solver = KluSolver(btf=btf)
+    a, b = random_system(12, seed=0)
+    num = solver.factor(a, solver.analyze(a))
+    x = solver.solve(num, b)
+    np.testing.assert_allclose(x, np.linalg.solve(a.toarray(), b), atol=1e-10)
+
+
+@requires_klu
+def test_klu_matches_superlu_on_the_same_system():
+    a, b = random_system(20, seed=4)
+    sym = KluSolver().analyze(a)
+    klu = KluSolver().solve(KluSolver().factor(a, sym), b)
+    superlu = SuperluSolver().solve(SuperluSolver().factor(a, SuperluSolver().analyze(a)), b)
+    np.testing.assert_allclose(klu, superlu, atol=1e-10)
+
+
+@requires_klu
+def test_klu_refactor_reuses_the_symbolic_analysis():
+    solver = KluSolver()
+    a0, _ = random_system(10, seed=1)
+    sym = solver.analyze(a0)
+    a1 = a0.copy()
+    a1.data = a1.data * 1.5 + 0.1  # same pattern, new values
+    b = np.arange(1.0, 11.0)
+    num = solver.refactor(a1, sym, solver.factor(a0, sym))
+    np.testing.assert_allclose(a1 @ solver.solve(num, b), b, atol=1e-10)
+
+
+@requires_klu
+def test_klu_rcond_is_a_finite_estimate():
+    solver = KluSolver()
+    a, _ = random_system(8, seed=2)
+    rc = solver.rcond(solver.factor(a, solver.analyze(a)))
+    assert rc is not None and 0.0 < rc <= 1.0
+
+
+@requires_klu
+def test_klu_rejects_a_structurally_singular_pattern():
+    # A 4x4 with an all-zero column 3 is structurally rank-deficient; BTF's
+    # maximum-transversal sees it at analyse time.
+    a = csc_matrix(np.diag([1.0, 1.0, 1.0, 0.0]))
+    with pytest.raises(SolveError, match="structurally singular"):
+        KluSolver().analyze(a)
+
+
+@requires_klu
+def test_klu_names_reflect_btf():
+    assert KluSolver(btf=True).name == "klu"
+    assert KluSolver(btf=False).name == "klu-nobtf"
+
+
+def test_klu_rejects_unknown_ordering():
+    with pytest.raises(SolveError, match="unknown KLU ordering"):
+        KluSolver(ordering="metis")

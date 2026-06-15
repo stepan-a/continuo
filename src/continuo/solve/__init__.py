@@ -13,6 +13,7 @@ from continuo.io.solution import Solution
 from continuo.solve.errors import SolveError
 from continuo.solve.linsolve import (
     SOLVERS,
+    KluSolver,
     LinearSolver,
     SuperluSolver,
     available_solvers,
@@ -32,6 +33,7 @@ __all__ = [
     "SolveError",
     "LinearSolver",
     "SuperluSolver",
+    "KluSolver",
     "SOLVERS",
     "available_solvers",
     "select_solver",

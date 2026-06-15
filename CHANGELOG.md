@@ -22,6 +22,16 @@ follows [Semantic Versioning](https://semver.org).
   unavailable presets raise a clear `SolveError`. A registry
   (`SOLVERS`, `available_solvers`, `select_solver`) backs the choice;
   optional backends register there in later releases.
+- Add the `klu` / `klu-nobtf` backends (`KluSolver`): a `ctypes` binding
+  to SuiteSparse KLU (`solve/_klu.py`) that reuses its BTF symbolic
+  analysis across numeric refactorisations, exploiting the
+  block-triangular structure of the one-step stacked Jacobian. `btf` is a
+  parameter of `KluSolver` (off for plain sparse LU), and `ordering`
+  selects AMD or COLAMD. The library is detected at runtime: `klu` is
+  offered only when `libklu.so` is present (Debian `libsuitesparse-dev`),
+  and a structurally singular Jacobian is reported at analysis time. The
+  selector still defaults `auto` to `superlu`; stencil-aware routing to
+  `klu` comes next.
 
 ## [0.0.1] — 2026-05-23
 

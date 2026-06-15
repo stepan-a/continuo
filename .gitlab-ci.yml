@@ -57,8 +57,14 @@ test:
   stage: test
   only:
     - master@stepan/continuo
+  # CI must exercise the KLU backend, so the runner host (puck) carries
+  # libsuitesparse-dev (which provides libklu.so). The guard below fails the
+  # pipeline loudly if the library ever goes missing, rather than letting the
+  # klu cross-checks silently skip. (The GitHub mirror installs the same
+  # library with apt — see .github/workflows/tests.yml.)
   script:
     - pip install --quiet -e ".[dev]"
+    - python -c "from continuo.solve import available_solvers; assert 'klu' in available_solvers(), 'libklu.so missing on the runner; install libsuitesparse-dev'"
     - pytest -q --tb=short
   tags:
     - stepan@puck
