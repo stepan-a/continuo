@@ -18,7 +18,7 @@ from continuo import ir
 from continuo.io.solution import Solution
 from continuo.macro import expand, expand_string
 from continuo.parser import parse as _parse_text
-from continuo.solve import simulate, steady_state
+from continuo.solve import LinearSolver, simulate, steady_state
 
 __all__ = ["Model", "parse", "parse_string"]
 
@@ -74,13 +74,18 @@ class Model:
         horizon: float | None = None,
         intervals: int | None = None,
         scheme: str | None = None,
+        solver: str | LinearSolver | None = None,
     ) -> Solution:
         """Run the perfect-foresight simulation, returning a :class:`Solution`.
 
         ``horizon`` / ``intervals`` / ``scheme`` override the model's
-        ``simulate`` command.
+        ``simulate`` command. ``solver`` selects the linear backend: a
+        preset name (``"superlu"``, ``"auto"``), a :class:`LinearSolver`
+        instance, or ``None`` (the ``"auto"`` default).
         """
-        return simulate(self._model, horizon=horizon, intervals=intervals, scheme=scheme)
+        return simulate(
+            self._model, horizon=horizon, intervals=intervals, scheme=scheme, solver=solver
+        )
 
 
 def parse(path: str | Path) -> Model:

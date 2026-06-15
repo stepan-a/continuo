@@ -24,13 +24,22 @@ dependency of continuo. It captures SciPy's COLAMD column ordering once in
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any, Protocol, runtime_checkable
 
 import numpy as np
 from scipy.sparse import csc_matrix
 from scipy.sparse.linalg import splu
 
-__all__ = ["LinearSolver", "SuperluSolver"]
+from continuo.solve.errors import SolveError
+
+__all__ = [
+    "LinearSolver",
+    "SuperluSolver",
+    "SOLVERS",
+    "available_solvers",
+    "select_solver",
+]
 
 
 @runtime_checkable
@@ -114,3 +123,51 @@ class SuperluSolver:
 
     def rcond(self, num: Any) -> float | None:
         return None
+
+
+# ---------------------------------------------------------------------------
+# registry and selection
+# ---------------------------------------------------------------------------
+
+# Preset name -> factory. Optional backends (klu, umfpack, pardiso) register
+# here as they are added; ``superlu`` is always present.
+SOLVERS: dict[str, Callable[[], LinearSolver]] = {
+    "superlu": lambda: SuperluSolver(),
+}
+
+
+def available_solvers() -> frozenset[str]:
+    """Preset names whose backend can actually run in this environment.
+
+    SciPy is a hard dependency, so ``superlu`` is always available; optional
+    backends probe their native libraries / packages and join the set in
+    later commits.
+    """
+    return frozenset({"superlu"})
+
+
+def select_solver(
+    requested: str | LinearSolver | None,
+    available: frozenset[str] | None = None,
+) -> LinearSolver:
+    """Resolve a user request into a concrete :class:`LinearSolver`.
+
+    ``requested`` is a preset name, an already-built solver instance (passed
+    through untouched for fine control), or ``None`` / ``"auto"`` to let
+    continuo choose. Unknown or unavailable presets raise :class:`SolveError`.
+    """
+    if isinstance(requested, LinearSolver):
+        return requested
+    available = available_solvers() if available is None else available
+    name = requested or "auto"
+    if name == "auto":
+        # Only one backend today; stencil-aware routing (one-step -> klu,
+        # multi-step -> banded) lands with those backends.
+        name = "superlu"
+    if name not in SOLVERS:
+        raise SolveError(f"unknown linear solver {name!r}; presets: {sorted(SOLVERS)}")
+    if name not in available:
+        raise SolveError(
+            f"linear solver {name!r} is unavailable here (available: {sorted(available)})"
+        )
+    return SOLVERS[name]()

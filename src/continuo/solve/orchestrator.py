@@ -36,6 +36,7 @@ from continuo.ir.model import Model
 from continuo.parser.ast import Expr
 from continuo.solve.disc import uniform_grid
 from continuo.solve.errors import SolveError
+from continuo.solve.linsolve import LinearSolver, select_solver
 from continuo.solve.numeric import constant_table, eval_constant
 from continuo.solve.pf import initial_conditions, solve_segment
 from continuo.solve.steady import evaluate_parameters, steady_state
@@ -53,17 +54,20 @@ def simulate(
     horizon: float | None = None,
     intervals: int | None = None,
     scheme: str | None = None,
+    solver: str | LinearSolver | None = None,
 ) -> Solution:
     """Solve the model's perfect-foresight transition, returning a Solution.
 
     ``horizon`` / ``intervals`` / ``scheme`` override the ``simulate``
     command; if both ``horizon`` and ``intervals`` are omitted the command
-    must supply them.
+    must supply them. ``solver`` selects the linear backend (preset name,
+    :class:`LinearSolver` instance, or the ``"auto"`` default).
     """
     theta = evaluate_parameters(model)
     horizon, intervals, scheme = _resolve_command(model, theta, horizon, intervals, scheme)
     if scheme != _SUPPORTED_SCHEME:
         raise SolveError(f"discretisation scheme {scheme!r} is not implemented yet")
+    linear = select_solver(solver)  # one backend for the whole run (constant pattern)
 
     residual = build_residual(model)
     dt = horizon / intervals
@@ -99,6 +103,7 @@ def simulate(
             initial_states=initial_states,
             terminal_jumps=terminal_jumps,
             guess=guess,
+            solver=linear,
         )
 
         realised = end_index - start_index
@@ -120,6 +125,7 @@ def simulate(
         "scheme": scheme,
         "segments": len(segments),
         "newton_iterations": sum(segment.iterations for segment in segments),
+        "solver": linear.name,
     }
     logger.info(
         "simulated %d segment(s), %d Newton iteration(s) total (%s)",

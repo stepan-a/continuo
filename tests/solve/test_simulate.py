@@ -233,3 +233,43 @@ def test_unimplemented_scheme_rejected():
     src = SADDLE + "simulate(T=2, N=4, scheme=radau);"
     with pytest.raises(SolveError, match="not implemented"):
         simulate(model(src))
+
+
+# --- linear-solver selection ----------------------------------------------
+
+
+def test_solver_preset_threads_through_and_is_recorded():
+    src = SADDLE + "simulate(T=2, N=4);"
+    sol = simulate(model(src), solver="superlu")
+    assert sol.diagnostics["solver"] == "superlu"
+    np.testing.assert_allclose(sol["x"], simulate(model(src))["x"], atol=1e-12)
+
+
+def test_solver_auto_is_the_default():
+    src = SADDLE + "simulate(T=2, N=4);"
+    assert simulate(model(src)).diagnostics["solver"] == "superlu"
+
+
+def test_solver_instance_is_accepted():
+    from continuo.solve import SuperluSolver
+
+    src = SADDLE + "simulate(T=2, N=4);"
+    sol = simulate(model(src), solver=SuperluSolver())
+    assert sol.diagnostics["solver"] == "superlu"
+
+
+def test_solver_threads_through_each_segment_of_a_surprise():
+    sol = simulate(model(SURPRISE), solver="superlu")
+    assert len(sol.segments) == 2
+    np.testing.assert_allclose(sol["x"], simulate(model(SURPRISE))["x"], atol=1e-12)
+
+
+def test_unknown_solver_rejected():
+    src = SADDLE + "simulate(T=2, N=4);"
+    with pytest.raises(SolveError, match="unknown linear solver"):
+        simulate(model(src), solver="nope")
+
+
+def test_solve_pf_records_the_solver():
+    sol = solve_pf(model(SADDLE), horizon=2.0, intervals=4, solver="superlu")
+    assert sol.diagnostics["solver"] == "superlu"

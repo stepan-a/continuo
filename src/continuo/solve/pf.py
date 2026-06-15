@@ -42,7 +42,7 @@ from continuo.parser.ast import (
 )
 from continuo.solve.disc import Grid, crank_nicolson_residual, uniform_grid
 from continuo.solve.errors import SolveError
-from continuo.solve.linsolve import LinearSolver, SuperluSolver
+from continuo.solve.linsolve import LinearSolver, SuperluSolver, select_solver
 from continuo.solve.numeric import constant_table, eval_constant
 from continuo.solve.steady import evaluate_parameters, steady_state
 
@@ -60,6 +60,7 @@ def solve_pf(
     horizon: float,
     intervals: int,
     exogenous: dict[str, float] | None = None,
+    solver: str | LinearSolver | None = None,
     tol: float = _TOL,
     max_iter: int = _MAX_ITER,
 ) -> Solution:
@@ -67,8 +68,13 @@ def solve_pf(
 
     States start from ``initval``; jumps are anchored at the terminal
     steady state computed at ``exogenous`` (constant over the segment).
+
+    ``solver`` selects the linear backend used for each Newton step: a
+    preset name (``"superlu"``, ``"auto"``), a :class:`LinearSolver`
+    instance, or ``None`` (the ``"auto"`` default).
     """
     e = dict(exogenous or {})
+    linear = select_solver(solver)
     theta = evaluate_parameters(model)
     residual = build_residual(model)
     grid = uniform_grid(horizon, intervals)
@@ -90,6 +96,7 @@ def solve_pf(
         initial_states=initial_states,
         terminal_jumps=terminal_jumps,
         guess=guess,
+        solver=linear,
         tol=tol,
         max_iter=max_iter,
     )
@@ -105,7 +112,12 @@ def solve_pf(
     return Solution(
         segments=(segment,),
         names=model.endogenous,
-        diagnostics={"scheme": "crank_nicolson", "segments": 1, "newton_iterations": iterations},
+        diagnostics={
+            "scheme": "crank_nicolson",
+            "segments": 1,
+            "newton_iterations": iterations,
+            "solver": linear.name,
+        },
     )
 
 

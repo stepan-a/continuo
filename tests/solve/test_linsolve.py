@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 from scipy.sparse import csc_matrix
 
-from continuo.solve.linsolve import LinearSolver, SuperluSolver
+from continuo.solve import SolveError
+from continuo.solve.linsolve import LinearSolver, SuperluSolver, select_solver
 
 
 def random_system(n: int, seed: int) -> tuple[csc_matrix, np.ndarray]:
@@ -62,3 +64,30 @@ def test_solve_accepts_a_list_rhs():
 
 def test_name():
     assert SuperluSolver().name == "superlu"
+
+
+# --- select_solver --------------------------------------------------------
+
+
+def test_select_default_and_auto_resolve_to_superlu():
+    assert isinstance(select_solver(None), SuperluSolver)
+    assert isinstance(select_solver("auto"), SuperluSolver)
+
+
+def test_select_named_preset():
+    assert select_solver("superlu").name == "superlu"
+
+
+def test_select_passes_instances_through_untouched():
+    instance = SuperluSolver()
+    assert select_solver(instance) is instance
+
+
+def test_select_unknown_preset_rejected():
+    with pytest.raises(SolveError, match="unknown linear solver"):
+        select_solver("nope")
+
+
+def test_select_unavailable_preset_rejected():
+    with pytest.raises(SolveError, match="unavailable"):
+        select_solver("superlu", available=frozenset())

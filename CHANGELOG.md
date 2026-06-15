@@ -15,6 +15,13 @@ follows [Semantic Versioning](https://semver.org).
   refreshed cheaply at each Newton step. The Newton core now drives the
   linear solve through this interface, with `SuperluSolver` (SciPy, the
   always-available backend) as the default — no change in results.
+- Add a `solver=` option to `Model.simul`, `continuo.solve_pf` and
+  `simulate`: a preset name (`"superlu"`, `"auto"`), a `LinearSolver`
+  instance for fine control, or `None` (the `"auto"` default). The
+  selected backend is recorded in the run diagnostics, and unknown or
+  unavailable presets raise a clear `SolveError`. A registry
+  (`SOLVERS`, `available_solvers`, `select_solver`) backs the choice;
+  optional backends register there in later releases.
 
 ## [0.0.1] — 2026-05-23
 
