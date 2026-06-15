@@ -10,7 +10,7 @@ Synopsis
 
 .. code-block:: console
 
-   continuo MODEL.mod [-o OUTPUT.csv] [-T HORIZON] [-N INTERVALS]
+   continuo MODEL.mod [-o OUTPUT.csv] [-T HORIZON] [-N INTERVALS] [--solver SOLVER]
 
 Positional argument
 -------------------
@@ -33,6 +33,12 @@ Options
 
 ``-N INTERVALS``, ``--intervals INTERVALS``
    Override the grid resolution ``N``. Integer, positive.
+
+``--solver SOLVER``
+   Choose the linear backend, overriding the ``simulate`` directive —
+   ``auto`` (default), ``superlu``, ``klu``, ``klu-nobtf``, ``umfpack``
+   or ``pardiso``. An unavailable backend is reported as a clean error.
+   See :doc:`solvers`.
 
 Output format
 -------------

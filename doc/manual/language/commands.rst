@@ -28,6 +28,14 @@ Arguments (all keyword):
    (implicit midpoint, second-order, A-stable) is implemented; other
    names parse but raise a ``SolveError`` at solve time.
 
+``solver`` (optional, preset name, default ``auto``)
+   The linear backend for the Newton solve — ``auto``, ``superlu``,
+   ``klu``, ``umfpack`` or ``pardiso``. Write the dashed preset as a
+   string: ``solver = "klu-nobtf"``. Unknown names are rejected when the
+   command is validated; whether a named backend is actually available is
+   decided at solve time. An explicit ``solver=`` argument on the API or
+   CLI overrides this directive. See :doc:`/solvers`.
+
 A file may contain at most one ``simulate`` command. The Python API
 and the CLI both allow overriding ``T`` and ``N`` at the call site:
 

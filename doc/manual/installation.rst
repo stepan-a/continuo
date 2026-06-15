@@ -36,6 +36,29 @@ xarray ``Dataset``; those conversions require the optional extras:
 
    $ pip install -e ".[pandas,xarray]"
 
+Linear-solver backends
+-----------------------
+
+The Newton solve runs on a pluggable linear backend (see :doc:`solvers`).
+SuperLU (via SciPy) is always available, so nothing extra is needed. The
+faster default for one-step schemes, **KLU**, needs the SuiteSparse system
+library ``libklu.so`` — it has no pip package; install it from your
+distribution:
+
+.. code-block:: console
+
+   $ sudo apt install libsuitesparse-dev      # Debian / Ubuntu
+   # or:  conda install -c conda-forge suitesparse
+
+When ``libklu.so`` is absent, continuo simply falls back to SuperLU. The
+two further optional backends are PyPI packages, installed as extras:
+
+.. code-block:: console
+
+   $ pip install -e ".[umfpack]"      # SuiteSparse UMFPACK
+   $ pip install -e ".[pardiso]"      # Intel MKL PARDISO (pulls in MKL)
+   $ pip install -e ".[solvers]"      # both
+
 To build this manual locally:
 
 .. code-block:: console

@@ -56,6 +56,28 @@ with run-level summary information. The keys currently set are:
    guess is poorer; inspect the per-segment counts via
    ``[seg.iterations for seg in sol.segments]``.
 
+``solver`` (``str``)
+   The linear backend that was used (e.g. ``"klu"``, ``"superlu"``).
+   See :doc:`solvers`.
+
+``factorizations`` / ``refactorizations`` (``int``)
+   How many full factorisations versus cheap refactorisations the
+   backend performed over the run. With the cross-segment warm-start, a
+   two-segment surprise typically shows one factorisation and one
+   refactorisation.
+
+``refactor_fallbacks`` (``int``)
+   How many times a reused factorisation failed (a stale-pivot
+   re-pivot) and was redone from scratch. Normally ``0``.
+
+``min_rcond`` (``float`` or ``None``)
+   The worst reciprocal-condition estimate seen over the run, or
+   ``None`` when the backend exposes none (SuperLU, PARDISO).
+
+``fill`` (``int`` or ``None``)
+   The factorisation fill ``nnz(L) + nnz(U)``, where the backend
+   exposes it (SuperLU, UMFPACK); ``None`` otherwise.
+
 The same summary is also emitted at ``logging.INFO`` level on the
 ``continuo.solve.orchestrator`` logger, so a caller that configures
 ``logging.basicConfig(level=logging.INFO)`` will see one line per run

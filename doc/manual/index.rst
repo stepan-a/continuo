@@ -21,8 +21,9 @@ The toolbox has three faces:
 This manual is the reference for all three. The :doc:`quickstart` shows
 the smallest end-to-end use; the :doc:`language/index` documents every
 block and built-in of the surface language; :doc:`api` is the Python
-reference (generated from docstrings); :doc:`examples` is the index of
-the worked-out example models that ship with the source tree.
+reference (generated from docstrings); :doc:`solvers` documents the
+pluggable linear backends and how to choose one; :doc:`examples` is the
+index of the worked-out example models that ship with the source tree.
 
 .. toctree::
    :maxdepth: 2
@@ -37,6 +38,7 @@ the worked-out example models that ship with the source tree.
 
    language/index
    api
+   solvers
    cli
    examples
 

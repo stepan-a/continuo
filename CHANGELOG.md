@@ -60,6 +60,14 @@ follows [Semantic Versioning](https://semver.org).
 - Add a `--solver` flag to the `continuo` CLI
   (`continuo model.mod --solver klu`), overriding the directive.
 
+### Documentation
+
+- Add a "Linear solvers" reference page to the manual (backends, presets,
+  `auto` routing, fine control, guard-rails, diagnostics) and document the
+  `solver=` directive, the `--solver` flag, the new diagnostics keys, and
+  the optional-backend install (`libsuitesparse-dev`, the `umfpack` /
+  `pardiso` / `solvers` extras).
+
 ## [0.0.1] — 2026-05-23
 
 First tagged release. The package was unversioned before this point;
