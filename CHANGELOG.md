@@ -38,6 +38,14 @@ follows [Semantic Versioning](https://semver.org).
   segments, carrying the factorisation forward to warm-start each
   segment's first Newton step (a refactor reusing the pivot order, with a
   safe fall-back to a full factor).
+- Add the optional `umfpack` and `pardiso` backends (`UmfpackSolver`,
+  `PardisoSolver`) and the `umfpack` / `pardiso` / `solvers` extras.
+  UMFPACK (`scikit-umfpack`) separates symbolic and numeric phases cleanly
+  and reports `rcond`; PARDISO (`pypardiso`, MKL, multithreaded) factorises
+  and solves for large / multi-core runs. Each is offered only when its
+  package is importable (probed without importing it, so the MKL load is
+  not paid unless PARDISO is actually used). Both remain non-default —
+  `auto` prefers KLU for one-step schemes.
 
 ## [0.0.1] — 2026-05-23
 

@@ -25,12 +25,13 @@ dependency of continuo. It captures SciPy's COLAMD column ordering once in
 from __future__ import annotations
 
 import contextlib
+import importlib.util
 import logging
 from collections.abc import Callable, Iterator
 from typing import Any, Protocol, runtime_checkable
 
 import numpy as np
-from scipy.sparse import csc_matrix
+from scipy.sparse import csc_matrix, csr_matrix
 from scipy.sparse.linalg import splu
 
 from continuo.solve import _klu
@@ -42,6 +43,8 @@ __all__ = [
     "LinearSolver",
     "SuperluSolver",
     "KluSolver",
+    "UmfpackSolver",
+    "PardisoSolver",
     "SOLVERS",
     "available_solvers",
     "select_solver",
@@ -220,29 +223,177 @@ def _as_solve_error() -> Iterator[None]:
         raise SolveError(str(exc)) from exc
 
 
+class _UmfpackSym:
+    """UMFPACK symbolic data: the context holding the reusable symbolic analysis."""
+
+    __slots__ = ("ctx",)
+
+    def __init__(self, ctx: Any):
+        self.ctx = ctx
+
+
+class _UmfpackNum:
+    """UMFPACK numeric data: the factorised context, its matrix, and rcond."""
+
+    __slots__ = ("ctx", "a", "rcond")
+
+    def __init__(self, ctx: Any, a: csc_matrix, rcond: float | None):
+        self.ctx = ctx
+        self.a = a
+        self.rcond = rcond
+
+
+class UmfpackSolver:
+    """SuiteSparse UMFPACK backend via ``scikit-umfpack`` (optional extra).
+
+    UMFPACK separates the symbolic analysis from the numeric factorisation
+    cleanly, so :meth:`analyze` runs it once and :meth:`refactor` re-runs only
+    the numeric phase. Its numeric phase is slower than SuperLU/KLU, so this
+    backend is offered for completeness rather than as a default. Requires the
+    ``umfpack`` extra (``scikit-umfpack``); uses the int32 ``"di"`` family.
+    """
+
+    name = "umfpack"
+
+    def analyze(self, a0: csc_matrix) -> _UmfpackSym:
+        from scikits import umfpack
+
+        ctx = umfpack.UmfpackContext("di")
+        ctx.symbolic(_umfpack_matrix(a0))
+        return _UmfpackSym(ctx)
+
+    def factor(self, a: csc_matrix, sym: _UmfpackSym) -> _UmfpackNum:
+        from scikits import umfpack
+
+        m = _umfpack_matrix(a)
+        sym.ctx.numeric(m)  # reuses the stored symbolic analysis
+        rcond = float(sym.ctx.info[umfpack.UMFPACK_RCOND])
+        return _UmfpackNum(sym.ctx, m, rcond)
+
+    def refactor(self, a: csc_matrix, sym: _UmfpackSym, num: _UmfpackNum) -> _UmfpackNum:
+        return self.factor(a, sym)  # the numeric phase already reuses the symbolic
+
+    def solve(self, num: _UmfpackNum, b: np.ndarray) -> np.ndarray:
+        from scikits import umfpack
+
+        return num.ctx.solve(umfpack.UMFPACK_A, num.a, np.asarray(b, dtype=float))
+
+    def rcond(self, num: _UmfpackNum) -> float | None:
+        return num.rcond
+
+
+class _PardisoNum:
+    """PARDISO numeric data: the factorised solver and its CSR matrix."""
+
+    __slots__ = ("ps", "a")
+
+    def __init__(self, ps: Any, a: csr_matrix):
+        self.ps = ps
+        self.a = a
+
+
+class PardisoSolver:
+    """Intel MKL PARDISO backend via ``pypardiso`` (optional extra).
+
+    PARDISO is multithreaded (MKL) and competitive on large problems, but its
+    analysis is expensive and it has no BTF, so it is offered for large /
+    multi-core runs rather than as a default. Its Python API does not expose a
+    symbolic-only phase, so :meth:`analyze` is a no-op and each :meth:`factor`
+    runs analysis + numeric factorisation. Requires the ``pardiso`` extra
+    (``pypardiso``); consumes CSR int32 matrices.
+    """
+
+    name = "pardiso"
+
+    def analyze(self, a0: csc_matrix) -> Any:
+        from pypardiso import PyPardisoSolver
+
+        return PyPardisoSolver()
+
+    def factor(self, a: csc_matrix, sym: Any) -> _PardisoNum:
+        m = _pardiso_matrix(a)
+        sym.factorize(m)
+        return _PardisoNum(sym, m)
+
+    def refactor(self, a: csc_matrix, sym: Any, num: _PardisoNum) -> _PardisoNum:
+        return self.factor(a, sym)
+
+    def solve(self, num: _PardisoNum, b: np.ndarray) -> np.ndarray:
+        return num.ps.solve(num.a, np.asarray(b, dtype=float))
+
+    def rcond(self, num: _PardisoNum) -> float | None:
+        return None
+
+
+def _umfpack_matrix(a: csc_matrix) -> csc_matrix:
+    """Canonical CSC, float64 data and int32 indices, isolated from the caller."""
+    a = a.tocsc()
+    m = csc_matrix(
+        (a.data.astype(np.float64), a.indices.astype(np.int32), a.indptr.astype(np.int32)),
+        shape=a.shape,
+    )
+    m.sum_duplicates()
+    m.sort_indices()
+    return m
+
+
+def _pardiso_matrix(a: csc_matrix) -> csr_matrix:
+    """Canonical CSR, float64 data and int32 indices, as PARDISO expects."""
+    a = a.tocsr()
+    m = csr_matrix(
+        (a.data.astype(np.float64), a.indices.astype(np.int32), a.indptr.astype(np.int32)),
+        shape=a.shape,
+    )
+    m.sum_duplicates()
+    m.sort_indices()
+    return m
+
+
 # ---------------------------------------------------------------------------
 # registry and selection
 # ---------------------------------------------------------------------------
 
-# Preset name -> factory. Optional backends (umfpack, pardiso) register here
-# as they are added; ``superlu`` is always present.
+# Preset name -> factory. ``superlu`` is always present; the others are gated
+# by availability (see :func:`available_solvers`).
 SOLVERS: dict[str, Callable[[], LinearSolver]] = {
     "superlu": lambda: SuperluSolver(),
     "klu": lambda: KluSolver(btf=True),
     "klu-nobtf": lambda: KluSolver(btf=False),
+    "umfpack": lambda: UmfpackSolver(),
+    "pardiso": lambda: PardisoSolver(),
 }
+
+_module_present: dict[str, bool] = {}
+
+
+def _has_module(name: str) -> bool:
+    """Whether an importable module is present, without importing it (cached).
+
+    ``find_spec`` locates the module without executing it, so probing for an
+    optional backend does not pay its (possibly heavy, e.g. MKL) import cost.
+    """
+    if name not in _module_present:
+        try:
+            _module_present[name] = importlib.util.find_spec(name) is not None
+        except (ImportError, ValueError):
+            _module_present[name] = False
+    return _module_present[name]
 
 
 def available_solvers() -> frozenset[str]:
     """Preset names whose backend can actually run in this environment.
 
-    SciPy is a hard dependency, so ``superlu`` is always available; ``klu``
-    needs ``libklu.so`` at runtime and is gated on its presence. Other
-    optional backends probe their packages and join the set in later commits.
+    SciPy is a hard dependency, so ``superlu`` is always available. ``klu``
+    needs ``libklu.so`` at runtime; ``umfpack`` and ``pardiso`` need their
+    optional packages (``scikit-umfpack`` / ``pypardiso``).
     """
     names = {"superlu"}
     if _klu.is_available():
         names |= {"klu", "klu-nobtf"}
+    if _has_module("scikits.umfpack"):
+        names.add("umfpack")
+    if _has_module("pypardiso"):
+        names.add("pardiso")
     return frozenset(names)
 
 

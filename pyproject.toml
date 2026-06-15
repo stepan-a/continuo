@@ -41,6 +41,14 @@ dependencies = [
 pandas = ["pandas>=2.0"]
 xarray = ["xarray>=2023.1"]
 hdf5 = ["h5py>=3.9"]
+# Optional linear-solver backends. klu has no pip dependency (a ctypes wrapper
+# over the system libklu.so); these two ship as PyPI packages.
+umfpack = ["scikit-umfpack>=0.4"]
+pardiso = ["pypardiso>=0.4"]
+solvers = [
+    "scikit-umfpack>=0.4",
+    "pypardiso>=0.4",
+]
 all = [
     "pandas>=2.0",
     "xarray>=2023.1",

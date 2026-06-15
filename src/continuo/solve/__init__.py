@@ -15,7 +15,9 @@ from continuo.solve.linsolve import (
     SOLVERS,
     KluSolver,
     LinearSolver,
+    PardisoSolver,
     SuperluSolver,
+    UmfpackSolver,
     available_solvers,
     select_solver,
 )
@@ -34,6 +36,8 @@ __all__ = [
     "LinearSolver",
     "SuperluSolver",
     "KluSolver",
+    "UmfpackSolver",
+    "PardisoSolver",
     "SOLVERS",
     "available_solvers",
     "select_solver",

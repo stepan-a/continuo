@@ -7,9 +7,22 @@ import pytest
 from scipy.sparse import csc_matrix
 
 from continuo.solve import SolveError, _klu, available_solvers
-from continuo.solve.linsolve import KluSolver, LinearSolver, SuperluSolver, select_solver
+from continuo.solve.linsolve import (
+    KluSolver,
+    LinearSolver,
+    PardisoSolver,
+    SuperluSolver,
+    UmfpackSolver,
+    select_solver,
+)
 
 requires_klu = pytest.mark.skipif(not _klu.is_available(), reason="libklu.so not available")
+requires_umfpack = pytest.mark.skipif(
+    "umfpack" not in available_solvers(), reason="scikit-umfpack not available"
+)
+requires_pardiso = pytest.mark.skipif(
+    "pardiso" not in available_solvers(), reason="pypardiso not available"
+)
 
 
 def random_system(n: int, seed: int) -> tuple[csc_matrix, np.ndarray]:
@@ -178,3 +191,78 @@ def test_klu_names_reflect_btf():
 def test_klu_rejects_unknown_ordering():
     with pytest.raises(SolveError, match="unknown KLU ordering"):
         KluSolver(ordering="metis")
+
+
+# --- UMFPACK backend ------------------------------------------------------
+
+
+@requires_umfpack
+def test_umfpack_is_advertised_and_selectable():
+    assert "umfpack" in available_solvers()
+    assert isinstance(select_solver("umfpack"), UmfpackSolver)
+    assert UmfpackSolver().name == "umfpack"
+
+
+@requires_umfpack
+def test_umfpack_solve_matches_dense():
+    solver = UmfpackSolver()
+    a, b = random_system(12, seed=0)
+    x = solver.solve(solver.factor(a, solver.analyze(a)), b)
+    np.testing.assert_allclose(x, np.linalg.solve(a.toarray(), b), atol=1e-10)
+
+
+@requires_umfpack
+def test_umfpack_refactor_reuses_the_symbolic_analysis():
+    solver = UmfpackSolver()
+    a0, _ = random_system(10, seed=1)
+    sym = solver.analyze(a0)
+    a1 = a0.copy()
+    a1.data = a1.data * 1.5 + 0.1  # same pattern, new values
+    b = np.arange(1.0, 11.0)
+    num = solver.refactor(a1, sym, solver.factor(a0, sym))
+    np.testing.assert_allclose(a1 @ solver.solve(num, b), b, atol=1e-10)
+
+
+@requires_umfpack
+def test_umfpack_rcond_is_a_finite_estimate():
+    solver = UmfpackSolver()
+    a, _ = random_system(8, seed=2)
+    rc = solver.rcond(solver.factor(a, solver.analyze(a)))
+    assert rc is not None and 0.0 < rc <= 1.0
+
+
+# --- PARDISO backend ------------------------------------------------------
+
+
+@requires_pardiso
+def test_pardiso_is_advertised_and_selectable():
+    assert "pardiso" in available_solvers()
+    assert isinstance(select_solver("pardiso"), PardisoSolver)
+    assert PardisoSolver().name == "pardiso"
+
+
+@requires_pardiso
+def test_pardiso_solve_matches_dense():
+    solver = PardisoSolver()
+    a, b = random_system(12, seed=0)
+    x = solver.solve(solver.factor(a, solver.analyze(a)), b)
+    np.testing.assert_allclose(x, np.linalg.solve(a.toarray(), b), atol=1e-10)
+
+
+@requires_pardiso
+def test_pardiso_refactor_solves_a_new_matrix():
+    solver = PardisoSolver()
+    a0, _ = random_system(10, seed=1)
+    sym = solver.analyze(a0)
+    a1 = a0.copy()
+    a1.data = a1.data * 1.5 + 0.1  # same pattern, new values
+    b = np.arange(1.0, 11.0)
+    num = solver.refactor(a1, sym, solver.factor(a0, sym))
+    np.testing.assert_allclose(a1 @ solver.solve(num, b), b, atol=1e-10)
+
+
+@requires_pardiso
+def test_pardiso_rcond_is_none():
+    solver = PardisoSolver()
+    a, _ = random_system(6, seed=3)
+    assert solver.rcond(solver.factor(a, solver.analyze(a))) is None
