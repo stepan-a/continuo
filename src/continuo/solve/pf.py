@@ -21,11 +21,11 @@ builds on it.
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import Any
 
 import casadi as ca
 import numpy as np
 from scipy.sparse import csc_matrix
-from scipy.sparse.linalg import spsolve
 
 from continuo.codegen.residual import Residual, build_residual
 from continuo.io.solution import Segment, Solution
@@ -42,6 +42,7 @@ from continuo.parser.ast import (
 )
 from continuo.solve.disc import Grid, crank_nicolson_residual, uniform_grid
 from continuo.solve.errors import SolveError
+from continuo.solve.linsolve import LinearSolver, SuperluSolver
 from continuo.solve.numeric import constant_table, eval_constant
 from continuo.solve.steady import evaluate_parameters, steady_state
 
@@ -50,6 +51,7 @@ __all__ = ["solve_pf", "solve_segment", "initial_conditions"]
 _TOL = 1e-10
 _MAX_ITER = 50
 _LINE_SEARCH_STEPS = 30
+_RCOND_FLOOR = 1e-12  # reuse the cheap refactor until conditioning drops below this
 
 
 def solve_pf(
@@ -117,6 +119,7 @@ def solve_segment(
     initial_states: dict[str, float],
     terminal_jumps: dict[str, float],
     guess: np.ndarray,
+    solver: LinearSolver | None = None,
     tol: float = _TOL,
     max_iter: int = _MAX_ITER,
 ) -> tuple[np.ndarray, int]:
@@ -125,13 +128,19 @@ def solve_segment(
     ``exogenous_at(t)`` gives the exogenous values at time ``t``; the
     collocation evaluates it at the interval midpoints and grid points,
     so a time-varying belief path is handled directly.
+
+    ``solver`` is the pluggable linear backend used for each Newton step;
+    it defaults to :class:`SuperluSolver`. The stacked Jacobian's pattern
+    is constant over the segment, so its symbolic phase is analysed once.
     """
+    solver = solver or SuperluSolver()
     theta_dm = _vector(theta[name] for name in model.parameters)
     residual_fn, jacobian_fn = _build_system(
         model, residual, grid, theta_dm, exogenous_at, initial_states, terminal_jumps
     )
     x0 = guess.reshape(-1).astype(float)
-    x, iterations = _newton(residual_fn, jacobian_fn, x0, tol, max_iter)
+    sym = solver.analyze(_to_csc(jacobian_fn(x0)))
+    x, iterations = _newton(residual_fn, jacobian_fn, x0, tol, max_iter, solver, sym)
     return x.reshape(grid.intervals + 1, len(model.endogenous)), iterations
 
 
@@ -206,24 +215,41 @@ def _row_split(residual: Residual, model: Model) -> tuple[list[int], list[int]]:
 
 
 def _newton(
-    residual_fn: ca.Function, jacobian_fn: ca.Function, x: np.ndarray, tol: float, max_iter: int
+    residual_fn: ca.Function,
+    jacobian_fn: ca.Function,
+    x: np.ndarray,
+    tol: float,
+    max_iter: int,
+    solver: LinearSolver,
+    sym: Any,
 ) -> tuple[np.ndarray, int]:
     def norm(z: np.ndarray) -> float:
         value = np.linalg.norm(np.array(residual_fn(z)).reshape(-1), np.inf)
         return value if np.isfinite(value) else np.inf
 
+    num: Any = None
     for iteration in range(1, max_iter + 1):
         g = np.array(residual_fn(x)).reshape(-1)
         current = np.linalg.norm(g, np.inf)
         if current < tol:
             return x, iteration - 1
-        step = spsolve(_to_csc(jacobian_fn(x)), -g)
+        a = _to_csc(jacobian_fn(x))
+        if num is None or _degraded(solver.rcond(num)):
+            num = solver.factor(a, sym)  # full factorisation: first step or guard-rail
+        else:
+            num = solver.refactor(a, sym, num)  # cheap refresh reusing the pivot order
+        step = solver.solve(num, -g)
         if not np.all(np.isfinite(step)):
             raise SolveError("singular Jacobian in the perfect-foresight solve")
         x = _line_search(x, step, current, norm)
     raise SolveError(
         "perfect-foresight solve did not converge; refine the grid or supply a better initial_guess"
     )
+
+
+def _degraded(rcond: float | None) -> bool:
+    """Whether a reused factorisation is too ill-conditioned to keep refactoring."""
+    return rcond is not None and rcond < _RCOND_FLOOR
 
 
 def _line_search(x: np.ndarray, step: np.ndarray, base: float, norm) -> np.ndarray:

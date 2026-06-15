@@ -4,6 +4,18 @@ All notable changes to **continuo** are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versioning
 follows [Semantic Versioning](https://semver.org).
 
+## [Unreleased]
+
+### Solver
+
+- Introduce a pluggable linear-solver interface (`solve/linsolve.py`):
+  the `LinearSolver` protocol exposes the `analyze` / `factor` /
+  `refactor` / `solve` phases so the constant sparsity pattern of the
+  stacked Jacobian is analysed once and the numeric factorisation is
+  refreshed cheaply at each Newton step. The Newton core now drives the
+  linear solve through this interface, with `SuperluSolver` (SciPy, the
+  always-available backend) as the default — no change in results.
+
 ## [0.0.1] — 2026-05-23
 
 First tagged release. The package was unversioned before this point;
