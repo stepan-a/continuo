@@ -6,7 +6,8 @@ import csv
 
 import pytest
 
-from continuo.cli import main
+from continuo.cli import _parse_options, main
+from continuo.solve import SolveError
 
 SADDLE = """
 var(state) x;
@@ -70,6 +71,40 @@ def test_unknown_solver_flag_reports_error(tmp_path, capsys):
     model = write_model(tmp_path)
     assert main([str(model), "--solver", "bogus"]) == 1
     assert "bogus" in capsys.readouterr().err
+
+
+def test_steady_solver_and_option_flags(tmp_path):
+    model = write_model(tmp_path)
+    rc = main(
+        [str(model), "--steady-solver", "newton", "--steady-solver-option", "line_search_steps=10"]
+    )
+    assert rc == 0
+    assert (tmp_path / "model.csv").exists()
+
+
+def test_steady_solver_option_without_solver_errors(tmp_path, capsys):
+    # Options need a named solver: 'auto' (the default) rejects them.
+    model = write_model(tmp_path)
+    assert main([str(model), "--steady-solver-option", "strategy=picard"]) == 1
+    assert "auto" in capsys.readouterr().err
+
+
+def test_parse_options_coerces_values():
+    assert _parse_options(["strategy=picard", "steps=20", "factor=0.1"]) == {
+        "strategy": "picard",
+        "steps": 20,
+        "factor": 0.1,
+    }
+
+
+def test_parse_options_empty_is_none():
+    assert _parse_options(None) is None
+    assert _parse_options([]) is None
+
+
+def test_parse_options_rejects_malformed():
+    with pytest.raises(SolveError, match="KEY=VALUE"):
+        _parse_options(["nope"])
 
 
 def test_missing_file_reports_error(tmp_path, capsys):

@@ -39,7 +39,13 @@ from continuo.solve.errors import SolveError
 from continuo.solve.linsolve import LinearSolver, select_solver
 from continuo.solve.numeric import constant_table, eval_constant
 from continuo.solve.pf import SolveStats, initial_conditions, solve_segment
-from continuo.solve.steady import evaluate_parameters, steady_state
+from continuo.solve.rootfind import SteadySolver, select_steady_solver
+from continuo.solve.steady import (
+    directive_solver,
+    directive_solver_options,
+    evaluate_parameters,
+    steady_state,
+)
 
 __all__ = ["simulate"]
 
@@ -59,6 +65,8 @@ def simulate(
     intervals: int | None = None,
     scheme: str | None = None,
     solver: str | LinearSolver | None = None,
+    steady_solver: str | SteadySolver | None = None,
+    steady_solver_options: dict[str, object] | None = None,
 ) -> Solution:
     """Solve the model's perfect-foresight transition, returning a Solution.
 
@@ -66,11 +74,24 @@ def simulate(
     command; if both ``horizon`` and ``intervals`` are omitted the command
     must supply them. ``solver`` selects the linear backend (preset name,
     :class:`LinearSolver` instance, or the ``"auto"`` default).
+    ``steady_solver`` selects the nonlinear algorithm for the internal
+    steady-state solves (the terminal anchor and the initial state),
+    overriding the ``steady(solver=…)`` directive; ``None`` falls back to
+    that directive, then to ``"auto"``. ``steady_solver_options`` configures
+    it (e.g. ``{"strategy": "picard"}``), overriding the directive's
+    ``options={…}``.
     """
     theta = evaluate_parameters(model)
     horizon, intervals, scheme, solver = _resolve_command(
         model, theta, horizon, intervals, scheme, solver
     )
+    if steady_solver is None:
+        steady_solver = directive_solver(model)
+        if steady_solver_options is None:
+            steady_solver_options = directive_solver_options(model)
+    # Resolve the steady backend once (validates name/options) and reuse the
+    # instance for every internal steady-state solve.
+    steady_backend = select_steady_solver(steady_solver, options=steady_solver_options)
     if scheme != _SUPPORTED_SCHEME:
         raise SolveError(f"discretisation scheme {scheme!r} is not implemented yet")
     # One backend for the whole run; auto routes by the scheme's coupling stencil.
@@ -98,10 +119,16 @@ def simulate(
         exogenous_at = _active_exogenous(schedule, start_index, param_symbols)
         grid = uniform_grid(horizon, intervals, start=start_time)
 
-        terminal_ss = steady_state(model, exogenous=exogenous_at(start_time + horizon))
+        terminal_ss = steady_state(
+            model, exogenous=exogenous_at(start_time + horizon), solver=steady_backend
+        )
         if carried is None:
-            initial_ss = steady_state(model, exogenous=exogenous_at(start_time))
-            initial_states = initial_conditions(model, theta, exogenous_at(start_time), initial_ss)
+            initial_ss = steady_state(
+                model, exogenous=exogenous_at(start_time), solver=steady_backend
+            )
+            initial_states = initial_conditions(
+                model, theta, exogenous_at(start_time), initial_ss, steady_solver=steady_backend
+            )
         else:
             initial_states = carried
         terminal_jumps = {name: terminal_ss[name] for name in model.jumps}

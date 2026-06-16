@@ -33,7 +33,13 @@ def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
     try:
         model = parse(args.model)
-        solution = model.simul(horizon=args.horizon, intervals=args.intervals, solver=args.solver)
+        solution = model.simul(
+            horizon=args.horizon,
+            intervals=args.intervals,
+            solver=args.solver,
+            steady_solver=args.steady_solver,
+            steady_solver_options=_parse_options(args.steady_solver_option),
+        )
     except _ERRORS as exc:
         print(f"continuo: error: {exc}", file=sys.stderr)
         return 1
@@ -61,7 +67,44 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         help="linear solver backend, overriding the simulate directive "
         "(e.g. auto, superlu, klu, klu-nobtf, umfpack, pardiso)",
     )
+    parser.add_argument(
+        "--steady-solver",
+        help="nonlinear steady-state algorithm, overriding the steady directive "
+        "(e.g. auto, newton, hybr, lm, kinsol, homotopy)",
+    )
+    parser.add_argument(
+        "--steady-solver-option",
+        action="append",
+        metavar="KEY=VALUE",
+        help="an option for the steady solver, repeatable "
+        "(e.g. --steady-solver-option strategy=picard)",
+    )
     return parser.parse_args(argv)
+
+
+def _parse_options(items: list[str] | None) -> dict[str, object] | None:
+    """Parse repeated ``KEY=VALUE`` flags into a dict, coercing numeric values."""
+    if not items:
+        return None
+    options: dict[str, object] = {}
+    for item in items:
+        key, sep, raw = item.partition("=")
+        if not sep or not key:
+            raise SolveError(f"--steady-solver-option expects KEY=VALUE, got {item!r}")
+        options[key] = _coerce(raw)
+    return options
+
+
+def _coerce(raw: str) -> object:
+    """A solver-option value: int, then float, else the raw string."""
+    try:
+        return int(raw)
+    except ValueError:
+        pass
+    try:
+        return float(raw)
+    except ValueError:
+        return raw
 
 
 def _write_csv(solution: Solution, output: Path) -> None:

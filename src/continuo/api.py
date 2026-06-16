@@ -18,7 +18,14 @@ from continuo import ir
 from continuo.io.solution import Solution
 from continuo.macro import expand, expand_string
 from continuo.parser import parse as _parse_text
-from continuo.solve import LinearSolver, simulate, steady_state
+from continuo.solve import (
+    LinearSolver,
+    SteadySolver,
+    directive_solver,
+    directive_solver_options,
+    simulate,
+    steady_state,
+)
 
 __all__ = ["Model", "parse", "parse_string"]
 
@@ -64,9 +71,28 @@ class Model:
 
     # -- solving ------------------------------------------------------------
 
-    def steady_state(self, *, exogenous: dict[str, float] | None = None) -> dict[str, float]:
-        """Compute the steady state at the given exogenous configuration."""
-        return steady_state(self._model, exogenous=exogenous)
+    def steady_state(
+        self,
+        *,
+        exogenous: dict[str, float] | None = None,
+        solver: str | SteadySolver | None = None,
+        options: dict[str, object] | None = None,
+    ) -> dict[str, float]:
+        """Compute the steady state at the given exogenous configuration.
+
+        ``solver`` selects the nonlinear algorithm for the numerical path: a
+        preset name (``"newton"``, ``"hybr"``, ``"kinsol"``, ``"homotopy"``,
+        …), a :class:`SteadySolver` instance, or ``None`` — which falls back
+        to the model's ``steady(solver=…)`` directive, then to ``"auto"``.
+        ``options`` configures a named preset (e.g. ``{"strategy": "picard"}``
+        for ``kinsol``); when both are omitted, the directive's ``solver`` and
+        ``options`` are used.
+        """
+        if solver is None:
+            solver = directive_solver(self._model)
+            if options is None:
+                options = directive_solver_options(self._model)
+        return steady_state(self._model, exogenous=exogenous, solver=solver, options=options)
 
     def simul(
         self,
@@ -75,16 +101,27 @@ class Model:
         intervals: int | None = None,
         scheme: str | None = None,
         solver: str | LinearSolver | None = None,
+        steady_solver: str | SteadySolver | None = None,
+        steady_solver_options: dict[str, object] | None = None,
     ) -> Solution:
         """Run the perfect-foresight simulation, returning a :class:`Solution`.
 
         ``horizon`` / ``intervals`` / ``scheme`` override the model's
         ``simulate`` command. ``solver`` selects the linear backend: a
         preset name (``"superlu"``, ``"auto"``), a :class:`LinearSolver`
-        instance, or ``None`` (the ``"auto"`` default).
+        instance, or ``None`` (the ``"auto"`` default). ``steady_solver``
+        selects the nonlinear algorithm for the internal steady-state solves,
+        overriding the ``steady(solver=…)`` directive, and
+        ``steady_solver_options`` configures it.
         """
         return simulate(
-            self._model, horizon=horizon, intervals=intervals, scheme=scheme, solver=solver
+            self._model,
+            horizon=horizon,
+            intervals=intervals,
+            scheme=scheme,
+            solver=solver,
+            steady_solver=steady_solver,
+            steady_solver_options=steady_solver_options,
         )
 
 

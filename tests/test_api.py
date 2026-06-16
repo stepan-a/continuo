@@ -6,6 +6,7 @@ import pytest
 
 import continuo
 from continuo import Model, Solution
+from continuo.solve import NewtonSolver, SolveError
 
 RBC = """
 var(state) K, A;
@@ -98,6 +99,76 @@ def test_end_to_end_rbc_transition():
     ss = continuo.parse_string(RBC).steady_state(exogenous={"z": 1.0})
     assert sol["K"][0] == pytest.approx(0.9 * ss["K"], rel=1e-6)
     assert sol["K"][-1] == pytest.approx(ss["K"], rel=1e-3)  # returns to SS
+
+
+# A numerical-steady-state model (no steady_state_model block).
+NUMERIC = """
+var(state) K;
+var Y;
+parameters alpha, delta;
+alpha = 0.3;
+delta = 0.1;
+model;
+  diff(K) = Y - delta * K;
+  Y = K^alpha;
+end;
+initial_guess;
+  K = 25;
+  Y = 2.5;
+end;
+"""
+
+_NUMERIC_K = 0.1 ** (1 / (0.3 - 1))
+
+
+@pytest.mark.parametrize("solver", ["newton", "hybr", "lm", "homotopy", "auto"])
+def test_steady_state_accepts_solver_choice(solver):
+    ss = continuo.parse_string(NUMERIC).steady_state(solver=solver)
+    assert ss["K"] == pytest.approx(_NUMERIC_K, rel=1e-6)
+
+
+def test_steady_state_unknown_solver_rejected():
+    with pytest.raises(SolveError, match="unknown steady-state solver 'magic'"):
+        continuo.parse_string(NUMERIC).steady_state(solver="magic")
+
+
+def test_steady_directive_supplies_the_default_solver():
+    model = continuo.parse_string(NUMERIC + "\nsteady(solver=hybr);")
+    # The directive is honoured when no explicit solver is passed.
+    assert model.steady_state()["K"] == pytest.approx(_NUMERIC_K, rel=1e-6)
+
+
+def test_steady_state_accepts_options():
+    ss = continuo.parse_string(NUMERIC).steady_state(
+        solver="newton", options={"line_search_steps": 10}
+    )
+    assert ss["K"] == pytest.approx(_NUMERIC_K, rel=1e-6)
+
+
+def test_steady_state_rejects_bad_options():
+    with pytest.raises(SolveError, match="invalid options"):
+        continuo.parse_string(NUMERIC).steady_state(solver="newton", options={"bogus": 1})
+
+
+def test_steady_directive_options_used_by_default():
+    model = continuo.parse_string(
+        NUMERIC + "\nsteady(solver=newton, options={line_search_steps: 10});"
+    )
+    assert model.steady_state()["K"] == pytest.approx(_NUMERIC_K, rel=1e-6)
+
+
+def test_explicit_solver_overrides_the_directive():
+    used: list[str] = []
+
+    class Spy(NewtonSolver):
+        def solve(self, problem, *, tol, max_iter):
+            used.append(self.name)
+            return super().solve(problem, tol=tol, max_iter=max_iter)
+
+    model = continuo.parse_string(NUMERIC + "\nsteady(solver=hybr);")
+    ss = model.steady_state(solver=Spy())
+    assert used == ["newton"]  # the explicit instance ran, not the directive's hybr
+    assert ss["K"] == pytest.approx(_NUMERIC_K, rel=1e-6)
 
 
 def test_parse_reads_a_file(tmp_path):

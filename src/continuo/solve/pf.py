@@ -45,6 +45,7 @@ from continuo.solve.disc import Grid, crank_nicolson_residual, uniform_grid
 from continuo.solve.errors import SolveError
 from continuo.solve.linsolve import LinearSolver, SuperluSolver, select_solver
 from continuo.solve.numeric import constant_table, eval_constant
+from continuo.solve.rootfind import SteadySolver, select_steady_solver
 from continuo.solve.steady import evaluate_parameters, steady_state
 
 __all__ = ["solve_pf", "solve_segment", "initial_conditions", "SolveStats"]
@@ -88,6 +89,8 @@ def solve_pf(
     intervals: int,
     exogenous: dict[str, float] | None = None,
     solver: str | LinearSolver | None = None,
+    steady_solver: str | SteadySolver | None = None,
+    steady_solver_options: dict[str, object] | None = None,
     tol: float = _TOL,
     max_iter: int = _MAX_ITER,
 ) -> Solution:
@@ -98,16 +101,20 @@ def solve_pf(
 
     ``solver`` selects the linear backend used for each Newton step: a
     preset name (``"superlu"``, ``"auto"``), a :class:`LinearSolver`
-    instance, or ``None`` (the ``"auto"`` default).
+    instance, or ``None`` (the ``"auto"`` default). ``steady_solver``
+    selects the nonlinear algorithm for the steady-state solves (preset
+    name, :class:`SteadySolver` instance, or the ``"auto"`` default), and
+    ``steady_solver_options`` configures a named preset.
     """
     e = dict(exogenous or {})
     linear = select_solver(solver)
+    steady_backend = select_steady_solver(steady_solver, options=steady_solver_options)
     theta = evaluate_parameters(model)
     residual = build_residual(model)
     grid = uniform_grid(horizon, intervals)
 
-    ss = steady_state(model, exogenous=e)
-    initial_states = initial_conditions(model, theta, e, ss)
+    ss = steady_state(model, exogenous=e, solver=steady_backend)
+    initial_states = initial_conditions(model, theta, e, ss, steady_solver=steady_backend)
     terminal_jumps = {name: ss[name] for name in model.jumps}
     guess = np.tile([ss[name] for name in model.endogenous], (grid.intervals + 1, 1))
 
@@ -363,7 +370,12 @@ def _to_csc(jacobian: ca.DM) -> csc_matrix:
 
 
 def initial_conditions(
-    model: Model, theta: dict[str, float], e: dict[str, float], ss: dict[str, float]
+    model: Model,
+    theta: dict[str, float],
+    e: dict[str, float],
+    ss: dict[str, float],
+    *,
+    steady_solver: str | SteadySolver | None = None,
 ) -> dict[str, float]:
     """Evaluate the initval initial states.
 
@@ -371,7 +383,8 @@ def initial_conditions(
     active exogenous ``e``. ``steady_state(v, e={…})`` resolves to the steady
     state at ``e`` overridden by the given exogenous values; this anchors the
     initial state at a *different* steady state than the active one, the case
-    of a change already in effect at ``t = 0``.
+    of a change already in effect at ``t = 0``. ``steady_solver`` selects the
+    nonlinear algorithm for those override solves.
     """
     table = constant_table(theta, e, model)
     cache: dict[tuple[tuple[str, float], ...], dict[str, float]] = {}
@@ -382,7 +395,7 @@ def initial_conditions(
         merged = {**e, **override}
         key = tuple(sorted(merged.items()))
         if key not in cache:
-            cache[key] = steady_state(model, exogenous=merged)
+            cache[key] = steady_state(model, exogenous=merged, solver=steady_solver)
         return cache[key]
 
     result: dict[str, float] = {}
