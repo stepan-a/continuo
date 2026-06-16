@@ -23,16 +23,16 @@ follows [Semantic Versioning](https://semver.org).
   (`SOLVERS`, `available_solvers`, `select_solver`) backs the choice;
   optional backends register there in later releases.
 - Add the `klu` / `klu-nobtf` backends (`KluSolver`): a `ctypes` binding
-  to SuiteSparse KLU (`solve/_klu.py`) that reuses its BTF symbolic
-  analysis across numeric refactorisations, exploiting the
-  block-triangular structure of the one-step stacked Jacobian. `btf` is a
-  parameter of `KluSolver` (off for plain sparse LU), and `ordering`
-  selects AMD or COLAMD. The library is detected at runtime: `klu` is
+  to SuiteSparse KLU (`solve/_klu.py`) that reuses its symbolic analysis
+  across numeric refactorisations — a cheap `refactor` per Newton step
+  instead of a full factorisation, the main per-step win. `btf` is a
+  parameter of `KluSolver` (block-triangular pre-ordering, off for plain
+  sparse LU), and `ordering` selects AMD or COLAMD. The library is detected at runtime: `klu` is
   offered only when `libklu.so` is present (Debian `libsuitesparse-dev`),
   and a structurally singular Jacobian is reported at analysis time.
 - Route `solver="auto"` (the default) by the scheme's coupling stencil:
   one-step schemes (Crank–Nicolson) now pick `klu` when it is available —
-  exploiting the block-triangular stacked Jacobian — and fall back to
+  whose amortised refactorisation is fastest here — and fall back to
   `superlu` otherwise (warning once). The multi-segment orchestrator
   analyses the constant sparsity pattern **once** and reuses it across
   segments, carrying the factorisation forward to warm-start each
@@ -73,7 +73,7 @@ follows [Semantic Versioning](https://semver.org).
   Two modes: end-to-end `Model.simul()` wall-clock and peak memory, and an
   isolated micro-benchmark (`--micro`) timing only the linear-solve phases
   (`factor + solve`, `refactor + solve`) on each model's real stacked
-  Jacobian — where KLU's block back-substitution shows a ~7× edge.
+  Jacobian — where KLU's amortised refactorisation shows a ~7× edge.
 
 ## [0.0.1] — 2026-05-23
 

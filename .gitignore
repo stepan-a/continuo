@@ -55,6 +55,7 @@ doc/manual/_build/
 *.rubbercache
 git.hash
 
-# Generated PDF (built and deployed by CI; see .gitlab-ci.yml)
+# Generated PDF (built by CI; see .gitlab-ci.yml). btf_figure.pdf is generated
+# from btf_figure.py during the slides build, slides.pdf by rubber.
 examples/nk-nonlinear/derivations.pdf
 doc/perfect-foresight/*.pdf

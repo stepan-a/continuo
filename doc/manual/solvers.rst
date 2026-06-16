@@ -66,11 +66,11 @@ Presets
      - fallback
    * - ``klu``
      - ``libklu.so`` (SuiteSparse)
-     - block-triangular form (BTF)
+     - reused symbolic factorisation; BTF
      - **yes** (one-step schemes)
    * - ``klu-nobtf``
      - ``libklu.so`` (SuiteSparse)
-     - sparsity (no BTF)
+     - reused symbolic factorisation (no BTF)
      - no
    * - ``umfpack``
      - ``scikit-umfpack`` extra
@@ -93,10 +93,10 @@ optional packages. Naming an unavailable preset raises a ``SolveError``.
 stencil*:
 
 - **one-step** schemes (Crank–Nicolson — the only scheme implemented
-  today) produce a block-triangular stacked Jacobian, which KLU's BTF
-  pre-ordering solves by block back-substitution. ``auto`` picks ``klu``
-  when it is available, and falls back to ``superlu`` otherwise (warning
-  once).
+  today) are solved fastest by ``klu``: it amortises the symbolic
+  factorisation across Newton steps (and segments), which dominates the
+  per-iteration cost. ``auto`` picks ``klu`` when it is available, and
+  falls back to ``superlu`` otherwise (warning once).
 
 So out of the box, a run uses KLU when ``libklu.so`` is installed and
 SuperLU otherwise — with no change in results, only in speed.
@@ -110,12 +110,16 @@ The backends
    the validation reference and the last-resort fallback.
 
 ``klu`` — the recommended one-step backend
-   A ``ctypes`` wrapper over SuiteSparse KLU. KLU pre-orders the matrix
-   into block triangular form and reuses that symbolic analysis across
-   numeric refactorisations, so the one-step stacked Jacobian is solved by
-   block back-substitution. ``klu-nobtf`` turns the BTF off, leaving a
-   plain sparse LU — useful where BTF is pure overhead. ``libklu.so`` is a
-   system library, not a pip package; install it with Debian's
+   A ``ctypes`` wrapper over SuiteSparse KLU. KLU separates the symbolic
+   analysis from the numeric factorisation and reuses it across
+   refactorisations, so each Newton step is a cheap ``refactor`` rather
+   than a full factorisation — the main reason it is ~7× faster than
+   SuperLU here. It also pre-orders into block triangular form (BTF),
+   which on these models only peels the algebraic and boundary rows as
+   1×1 blocks (the dynamic states/jumps couple forward and backward into
+   one large irreducible block), so BTF is a secondary, sometimes neutral,
+   refinement; ``klu-nobtf`` turns it off. ``libklu.so`` is a system
+   library, not a pip package; install it with Debian's
    ``libsuitesparse-dev`` (or conda's ``suitesparse``). When it is absent,
    continuo falls back to SuperLU automatically.
 
@@ -341,8 +345,9 @@ evaluation. The tables below isolate the **linear solve** on each model's
 real stacked Jacobian: ``factor + solve`` (a cold Newton step, factorising
 from scratch) and ``refactor + solve`` (the warm per-iteration cost, reusing
 the symbolic analysis and pivot order — what dominates a Newton solve once
-the analysis is amortised). This is where KLU's block back-substitution pulls
-ahead. Regenerate with ``python examples/benchmark_solvers.py --micro --write``.
+the analysis is amortised). This warm refactor is where KLU pulls ahead: it
+reuses the factorisation continuo analysed once, whereas SuperLU re-factorises
+in full. Regenerate with ``python examples/benchmark_solvers.py --micro --write``.
 
 .. MICROBENCH START
 
