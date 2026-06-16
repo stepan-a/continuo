@@ -151,6 +151,54 @@ def test_steady_e_must_be_mapping():
         ir("steady(e=5);")
 
 
+def test_steady_solver_defaults_to_none():
+    assert ir("steady;").steady_queries[0].solver is None
+
+
+def test_steady_solver_as_identifier():
+    assert ir("steady(solver=newton);").steady_queries[0].solver == "newton"
+
+
+def test_steady_solver_as_string_for_dashed_preset():
+    assert ir('steady(solver="df-sane");').steady_queries[0].solver == "df-sane"
+
+
+def test_steady_rejects_unknown_solver():
+    with pytest.raises(IRError, match="unknown steady-state solver 'magic'"):
+        ir("steady(solver=magic);")
+
+
+def test_steady_options_parsed():
+    m = ir('steady(solver=kinsol, options={strategy: "picard", steps: 20});')
+    q = m.steady_queries[0]
+    assert q.solver == "kinsol"
+    assert q.options == {"strategy": "picard", "steps": 20}
+
+
+def test_steady_options_bare_identifier_value():
+    q = ir("steady(solver=kinsol, options={strategy: picard});").steady_queries[0]
+    assert q.options == {"strategy": "picard"}
+
+
+def test_steady_options_keeps_float():
+    q = ir("steady(solver=hybr, options={factor: 0.1});").steady_queries[0]
+    assert q.options == {"factor": 0.1}
+
+
+def test_steady_options_default_none():
+    assert ir("steady(solver=newton);").steady_queries[0].options is None
+
+
+def test_steady_options_requires_solver():
+    with pytest.raises(IRError, match="options requires a solver"):
+        ir("steady(options={strategy: picard});")
+
+
+def test_steady_options_must_be_mapping():
+    with pytest.raises(IRError, match="options must be a"):
+        ir("steady(solver=kinsol, options=5);")
+
+
 # --- multiple commands ----------------------------------------------------
 
 

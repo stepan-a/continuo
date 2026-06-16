@@ -6,7 +6,7 @@ import pytest
 
 from continuo.ir import build
 from continuo.parser import parse
-from continuo.solve import SolveError, evaluate_parameters, steady_state
+from continuo.solve import SolveError, directive_solver, evaluate_parameters, steady_state
 
 
 def model(src: str):
@@ -69,9 +69,11 @@ def test_singular_jacobian_rejected():
 
 
 def test_non_convergence_rejected():
+    # A per-iteration cap of 0 starves Newton; the explicit backend cannot
+    # fall through to the auto chain, so the failure surfaces.
     src = LINEAR
     with pytest.raises(SolveError, match="did not converge"):
-        steady_state(model(src), max_iter=0)
+        steady_state(model(src), solver="newton", max_iter=0)
 
 
 def test_initial_guess_is_used():
@@ -119,6 +121,29 @@ def test_analytical_uses_exogenous_on_rhs():
     )
     ss = steady_state(model(src), exogenous={"a": 4.0})
     assert ss["K"] == pytest.approx(4.0)
+
+
+def test_solver_choice_matches_default():
+    src = (
+        "var(state) K;\nvar Y;\nparameters alpha, delta;\n"
+        "alpha = 0.3;\ndelta = 0.1;\n"
+        "model;\n  diff(K) = Y - delta * K;\n  Y = K^alpha;\nend;\n"
+        "initial_guess;\n  K = 25;\n  Y = 2.5;\nend;"
+    )
+    expected = steady_state(model(src))["K"]
+    for solver in ("newton", "hybr", "homotopy"):
+        assert steady_state(model(src), solver=solver)["K"] == pytest.approx(expected, rel=1e-8)
+
+
+# --- the steady directive's solver ----------------------------------------
+
+
+def test_directive_solver_reads_the_steady_directive():
+    assert directive_solver(model(LINEAR + "steady(solver=hybr);")) == "hybr"
+
+
+def test_directive_solver_is_none_when_absent():
+    assert directive_solver(model(LINEAR)) is None
 
 
 def test_higher_order_auxiliary_steady_state_is_zero():

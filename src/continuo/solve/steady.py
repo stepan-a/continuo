@@ -6,9 +6,13 @@ with every time derivative set to zero, at a given exogenous configuration
 
 - *analytical* — when the model carries a ``steady_state_model`` block, its
   assignments are a sequential closed form; evaluate them in order.
-- *numerical* — otherwise, Newton's method on ``F(0, x, e, θ) = 0`` using
-  the codegen residual and its ``∂F/∂x``, with a backtracking line search
-  for robustness. The starting iterate comes from ``initial_guess`` (or a
+- *numerical* — otherwise, a nonlinear root-find on ``F(0, x, e, θ) = 0``
+  using the codegen residual and its ``∂F/∂x``. The algorithm is pluggable
+  (see :mod:`continuo.solve.rootfind`): ``solver=`` selects a preset
+  (``"newton"``, ``"hybr"``, ``"kinsol"``, ``"homotopy"``, …) or an
+  :class:`~continuo.solve.rootfind.SteadySolver` instance, defaulting to the
+  ``"auto"`` chain (a trust-region hybrid, then least-squares, then
+  continuation). The starting iterate comes from ``initial_guess`` (or a
   caller-supplied guess), falling back to 1.0 per variable.
 
 Parameter values are themselves expressions (e.g. ``beta = 1/(1+rho)``);
@@ -18,6 +22,9 @@ order, so a value may reference an earlier parameter.
 
 from __future__ import annotations
 
+import logging
+from typing import Any
+
 import casadi as ca
 import numpy as np
 
@@ -26,12 +33,44 @@ from continuo.codegen.translate import SymbolTable
 from continuo.ir.model import Model
 from continuo.solve.errors import SolveError
 from continuo.solve.numeric import constant_table, eval_constant
+from continuo.solve.rootfind import RootProblem, SteadySolver, select_steady_solver
 
-__all__ = ["evaluate_parameters", "steady_state"]
+logger = logging.getLogger(__name__)
+
+__all__ = ["evaluate_parameters", "steady_state", "directive_solver", "directive_solver_options"]
+
+
+def _first_solver_query(model: Model):
+    """The first ``steady`` directive that names a solver, or ``None``."""
+    for query in model.steady_queries:
+        if query.solver is not None:
+            return query
+    return None
+
+
+def directive_solver(model: Model) -> str | None:
+    """The nonlinear solver named on the model's ``steady`` directive, if any.
+
+    Returns the first ``steady(solver=…)`` preset found, so a model file can
+    set the steady-state algorithm once for both the standalone inspection
+    and the internal solves of a run. ``None`` when no directive names one.
+    """
+    query = _first_solver_query(model)
+    return query.solver if query is not None else None
+
+
+def directive_solver_options(model: Model) -> dict[str, Any] | None:
+    """The ``options={…}`` of the model's ``steady`` directive, if any.
+
+    Read from the same directive :func:`directive_solver` takes the name from,
+    so a name and its options stay together.
+    """
+    query = _first_solver_query(model)
+    return query.options if query is not None else None
+
 
 _TOL = 1e-10
 _MAX_ITER = 50
-_LINE_SEARCH_STEPS = 30
 
 
 def evaluate_parameters(model: Model) -> dict[str, float]:
@@ -52,19 +91,26 @@ def steady_state(
     *,
     exogenous: dict[str, float] | None = None,
     guess: dict[str, float] | None = None,
+    solver: str | SteadySolver | None = None,
+    options: dict[str, Any] | None = None,
     tol: float = _TOL,
     max_iter: int = _MAX_ITER,
 ) -> dict[str, float]:
     """Compute the steady state, returning ``{endogenous_name: value}``.
 
     ``exogenous`` gives the values of the ``varexo`` (default 0); ``guess``
-    seeds / overrides the numerical starting iterate.
+    seeds / overrides the numerical starting iterate. ``solver`` selects the
+    nonlinear algorithm for the numerical path — a preset name, a
+    :class:`~continuo.solve.rootfind.SteadySolver` instance, or ``None`` (the
+    ``"auto"`` default). ``options`` configures the named preset (e.g.
+    ``{"strategy": "picard"}`` for ``kinsol``); both are ignored on the
+    analytical path, which is a closed form.
     """
     theta = evaluate_parameters(model)
     e = dict(exogenous or {})
     if model.steady_state:
         return _analytical(model, theta, e)
-    return _numerical(model, theta, e, guess, tol, max_iter)
+    return _numerical(model, theta, e, guess, solver, options, tol, max_iter)
 
 
 # ---------------------------------------------------------------------------
@@ -91,6 +137,8 @@ def _numerical(
     theta: dict[str, float],
     e: dict[str, float],
     guess: dict[str, float] | None,
+    solver: str | SteadySolver | None,
+    options: dict[str, Any] | None,
     tol: float,
     max_iter: int,
 ) -> dict[str, float]:
@@ -108,34 +156,37 @@ def _numerical(
         out = residual.jacobian_x(xdot_zero, ca.DM(x), e_vec, theta_vec, 0.0)
         return np.array(out)
 
-    def norm(x: np.ndarray) -> float:
-        value = np.linalg.norm(g(x), np.inf)
-        return value if np.isfinite(value) else np.inf
-
-    x = _starting_iterate(model, theta, e, guess)
-    for _ in range(max_iter):
-        current = norm(x)
-        if current < tol:
-            return dict(zip(endogenous, x.tolist(), strict=True))
-        try:
-            step = np.linalg.solve(jac(x), -g(x))
-        except np.linalg.LinAlgError:
-            raise SolveError("steady-state Jacobian is singular") from None
-        x = _line_search(x, step, current, norm)
-    raise SolveError(
-        "steady state did not converge; supply an initial_guess block with a "
-        "starting iterate closer to the solution"
+    x0 = _starting_iterate(model, theta, e, guess)
+    problem = RootProblem(
+        g,
+        jac,
+        x0,
+        residual_function=_residual_of_x(residual, xdot_zero, e_vec, theta_vec, len(endogenous)),
+        names=tuple(endogenous),
     )
+    backend = select_steady_solver(solver, options=options)
+    result = backend.solve(problem, tol=tol, max_iter=max_iter)
+    if not result.success:
+        raise SolveError(
+            f"steady state did not converge ({result.message}); try another "
+            "solver= or supply an initial_guess block closer to the solution"
+        )
+    logger.info(
+        "steady state: %s converged in %d iterations (‖F‖∞=%.2e)",
+        result.algorithm,
+        result.iterations,
+        result.residual_norm,
+    )
+    return dict(zip(endogenous, result.x.tolist(), strict=True))
 
 
-def _line_search(x: np.ndarray, step: np.ndarray, base: float, norm) -> np.ndarray:
-    alpha = 1.0
-    for _ in range(_LINE_SEARCH_STEPS):
-        candidate = x + alpha * step
-        if norm(candidate) < base:
-            return candidate
-        alpha *= 0.5
-    return x + alpha * step  # take the smallest step rather than stall
+def _residual_of_x(
+    residual, xdot_zero: ca.DM, e_vec: ca.DM, theta_vec: ca.DM, n: int
+) -> ca.Function:
+    """A CasADi ``Function`` mapping ``x`` to ``F(0, x, e, θ, 0)`` for KINSOL."""
+    x_sx = ca.SX.sym("x", n)
+    f_sx = residual.function(xdot_zero, x_sx, e_vec, theta_vec, 0.0)
+    return ca.Function("F_ss", [x_sx], [f_sx], ["x"], ["F"])
 
 
 def _starting_iterate(

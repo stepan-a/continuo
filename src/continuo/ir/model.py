@@ -58,11 +58,16 @@ class SteadyQuery:
 
     ``time`` is the point on the horizon to evaluate at (``None`` for the
     bare ``steady;`` default of ``t = T``); ``exogenous`` is an optional
-    ``e={…}`` override expression.
+    ``e={…}`` override expression. ``solver`` is the nonlinear-solver preset
+    named in the directive (``None`` when unspecified, leaving the choice to
+    ``auto`` / the caller), and ``options`` carries its ``options={…}``
+    mapping (``None`` when unspecified).
     """
 
     time: Expr | None
     exogenous: Expr | None
+    solver: str | None = None
+    options: dict[str, object] | None = None
 
 
 @dataclass

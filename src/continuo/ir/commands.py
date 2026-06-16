@@ -6,11 +6,12 @@ integer number of intervals) are mandatory keyword arguments, ``scheme``
 is an optional discretisation scheme (default ``crank_nicolson``), and no
 other options exist in v1.
 
-``steady[(t=…[, e={…}])]`` evaluates a steady state for inspection: bare
-``steady;`` means ``t = T`` under the final information set, ``t`` selects
-a point on the horizon (non-negative), and ``e={…}`` overrides exogenous
-values. The ``t > T`` out-of-range check needs the horizon and is left to
-the orchestrator.
+``steady[(t=…[, e={…}][, solver=…])]`` evaluates a steady state for
+inspection: bare ``steady;`` means ``t = T`` under the final information
+set, ``t`` selects a point on the horizon (non-negative), ``e={…}``
+overrides exogenous values, and ``solver`` names the nonlinear algorithm
+(see :mod:`continuo.solve.rootfind`). The ``t > T`` out-of-range check
+needs the horizon and is left to the orchestrator.
 """
 
 from __future__ import annotations
@@ -38,9 +39,25 @@ __all__ = ["attach_commands"]
 _SCHEMES = {"crank_nicolson", "radau", "sdirk", "lobatto_iiia"}
 _DEFAULT_SCHEME = "crank_nicolson"
 
-# Linear-solver presets the directive recognises (mirrors solve.SOLVERS plus
-# "auto"); whether a named backend is actually available is checked at solve time.
+# Linear-solver presets the simulate directive recognises (mirrors
+# solve.SOLVERS plus "auto"); availability is checked at solve time.
 _SOLVERS = {"auto", "superlu", "klu", "klu-nobtf", "umfpack", "pardiso"}
+
+# Nonlinear steady-state solver presets the steady directive recognises
+# (mirrors solve.rootfind.STEADY_SOLVERS plus "auto"); availability (e.g.
+# "kinsol" needing the CasADi plugin) is checked at solve time.
+_STEADY_SOLVERS = {
+    "auto",
+    "newton",
+    "hybr",
+    "lm",
+    "broyden",
+    "krylov",
+    "df-sane",
+    "anderson",
+    "kinsol",
+    "homotopy",
+}
 
 
 def attach_commands(model: Model, model_file: ModelFile) -> Model:
@@ -137,16 +154,78 @@ def _check_positive(name: str, expr: Expr, *, integer: bool) -> None:
 def _steady(cmd: SteadyCommand) -> SteadyQuery:
     if cmd.args:
         raise IRError("steady takes keyword arguments only (t=…, e={…})", cmd.pos)
-    options = _collect(cmd.kwargs, allowed=("t", "e"), what="steady")
-    time = options.get("t")
+    kwargs = _collect(cmd.kwargs, allowed=("t", "e", "solver", "options"), what="steady")
+    time = kwargs.get("t")
     if time is not None:
         value = _literal(time)
         if value is not None and value < 0:
             raise IRError("steady t must be non-negative", getattr(time, "pos", None))
-    exogenous = options.get("e")
+    exogenous = kwargs.get("e")
     if exogenous is not None and not isinstance(exogenous, DictLiteral):
         raise IRError("steady 'e' must be a {…} mapping", getattr(exogenous, "pos", None))
-    return SteadyQuery(time, exogenous)
+    if "options" in kwargs and "solver" not in kwargs:
+        raise IRError(
+            "steady options requires a solver (e.g. solver=kinsol)",
+            getattr(kwargs["options"], "pos", None),
+        )
+    return SteadyQuery(
+        time,
+        exogenous,
+        _steady_solver(kwargs.get("solver")),
+        _steady_options(kwargs.get("options")),
+    )
+
+
+def _steady_solver(value: Expr | None) -> str | None:
+    """A steady-state solver preset named as a bare identifier or a string."""
+    if value is None:
+        return None
+    if isinstance(value, Identifier):
+        name = value.name
+    elif isinstance(value, StringLit):
+        name = value.value
+    else:
+        raise IRError(
+            "steady solver must be a solver name (e.g. solver=newton)",
+            getattr(value, "pos", None),
+        )
+    if name not in _STEADY_SOLVERS:
+        raise IRError(
+            f"unknown steady-state solver {name!r}; expected one of "
+            f"{', '.join(sorted(_STEADY_SOLVERS))}",
+            getattr(value, "pos", None),
+        )
+    return name
+
+
+def _steady_options(value: Expr | None) -> dict[str, object] | None:
+    """Parse ``options={key: literal, …}`` into a plain Python dict.
+
+    Values are literals — a string, a number (kept as ``int`` when integral,
+    else ``float``), or a bare identifier (taken as a string, so
+    ``strategy = picard`` and ``strategy = "picard"`` are equivalent)."""
+    if value is None:
+        return None
+    if not isinstance(value, DictLiteral):
+        raise IRError("steady options must be a {…} mapping", getattr(value, "pos", None))
+    result: dict[str, object] = {}
+    for entry in value.entries:
+        result[entry.key.name] = _option_value(entry.value)
+    return result
+
+
+def _option_value(expr: Expr) -> object:
+    if isinstance(expr, StringLit):
+        return expr.value
+    if isinstance(expr, Identifier):
+        return expr.name
+    number = _literal(expr)  # NumberLit or negated NumberLit
+    if number is not None:
+        return int(number) if number == int(number) else number
+    raise IRError(
+        "steady options values must be strings, numbers or names",
+        getattr(expr, "pos", None),
+    )
 
 
 # ---------------------------------------------------------------------------
