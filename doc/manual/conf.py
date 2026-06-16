@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 
@@ -20,6 +21,10 @@ try:
     from continuo import __version__ as release
 except Exception:  # pragma: no cover - fallback for un-installed builds
     release = "0.0.4-dev"
+# PEP 440 normalises the source's ``X.Y.Z-dev`` to ``X.Y.Z.dev0`` in the
+# installed metadata; render it back to the source's ``-dev`` spelling for the
+# title and the stable/dev banner.
+release = re.sub(r"\.dev\d*$", "-dev", release)
 version = release
 
 # -- General configuration --------------------------------------------------
