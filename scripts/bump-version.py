@@ -5,14 +5,15 @@ The single source of truth is ``pyproject.toml``. This helper reads the
 current version from there and replaces it consistently in:
 
 - ``pyproject.toml`` (``version = "X.Y.Z"``)
-- ``tests/test_smoke.py`` (``__version__ == "X.Y.Z"``)
 - ``doc/manual/conf.py`` (the ``release = "X.Y.Z"`` fallback)
 - ``README.md`` (the status line ``(vX.Y.Z, YYYY-MM-DD)``)
 - ``CHANGELOG.md`` — inserts a new ``## [X.Y.Z] — YYYY-MM-DD`` entry
   template at the top and a matching tag-link footnote.
 
 The runtime ``continuo.__version__`` is resolved dynamically via
-``importlib.metadata`` and needs no edit.
+``importlib.metadata`` and needs no edit; ``tests/test_smoke.py`` checks
+it against ``importlib.metadata.version("continuo")`` rather than a
+hard-coded literal, so it needs no edit either.
 
 Usage::
 
@@ -141,10 +142,6 @@ def main(argv: list[str] | None = None) -> int:
 
     replace_once(ROOT / "pyproject.toml",
                  f'version = "{current}"', f'version = "{new}"',
-                 dry_run=args.check)
-    replace_once(ROOT / "tests/test_smoke.py",
-                 f'continuo.__version__ == "{current}"',
-                 f'continuo.__version__ == "{new}"',
                  dry_run=args.check)
     replace_once(ROOT / "doc/manual/conf.py",
                  f'release = "{current}"', f'release = "{new}"',

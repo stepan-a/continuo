@@ -9,7 +9,7 @@ for solving continuous-time macroeconomic models, with perfect-foresight
 deterministic transitions, multi-revelation surprises, and permanent
 parameter changes.
 
-**Status: pre-alpha (v0.0.1, 2026-05-23).** The pipeline runs end to end
+**Status: pre-alpha (v0.0.2, 2026-06-16).** The pipeline runs end to end
 — a `.mod` file solves to a path — and a reference manual ships with the
 source, but interfaces may still change. See [`CHANGELOG.md`](CHANGELOG.md)
 for what is in this release.
