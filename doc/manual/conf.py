@@ -19,7 +19,7 @@ copyright = "2026, Stéphane Adjemian"
 try:
     from continuo import __version__ as release
 except Exception:  # pragma: no cover - fallback for un-installed builds
-    release = "0.0.3-dev"
+    release = "0.0.3"
 version = release
 
 # -- General configuration --------------------------------------------------

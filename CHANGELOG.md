@@ -4,7 +4,7 @@ All notable changes to **continuo** are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versioning
 follows [Semantic Versioning](https://semver.org).
 
-## [Unreleased]
+## [0.0.3] — 2026-06-16
 
 ### Solver
 
@@ -238,5 +238,6 @@ and the simulation results:
 - Only the Crank–Nicolson discretisation scheme is implemented;
   Radau, SDIRK and Lobatto IIIA are deferred.
 
+[0.0.3]: https://github.com/stepan-a/continuo/releases/tag/v0.0.3
 [0.0.2]: https://github.com/stepan-a/continuo/releases/tag/v0.0.2
 [0.0.1]: https://github.com/stepan-a/continuo/releases/tag/v0.0.1
