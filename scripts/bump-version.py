@@ -2,13 +2,18 @@
 """Bump the continuo package version across every place it is mentioned.
 
 The single source of truth is ``pyproject.toml``. This helper reads the
-current version from there and replaces it consistently in:
+current version from there and replaces it consistently. Two modes:
 
-- ``pyproject.toml`` (``version = "X.Y.Z"``)
-- ``doc/manual/conf.py`` (the ``release = "X.Y.Z"`` fallback)
-- ``README.md`` (the status line ``(vX.Y.Z, YYYY-MM-DD)``)
-- ``CHANGELOG.md`` — inserts a new ``## [X.Y.Z] — YYYY-MM-DD`` entry
-  template at the top and a matching tag-link footnote.
+- a **release** bump (``X.Y.Z``) touches every version mention:
+  ``pyproject.toml`` (``version``), ``doc/manual/conf.py`` (the ``release``
+  fallback), ``README.md`` (the status line ``(vX.Y.Z, YYYY-MM-DD)``) and
+  ``CHANGELOG.md`` (a new ``## [X.Y.Z]`` entry + tag-link footnote);
+- a **dev** bump (``--dev``) marks master as in-development *after* a
+  release: it sets ``X.Y.(Z+1)-dev`` (or ``<version>-dev``) in
+  ``pyproject.toml`` and ``conf.py`` only. ``README.md`` and ``CHANGELOG.md``
+  track releases, not the dev cycle, so they are left untouched; the
+  ``-dev`` suffix sorts *before* its release (``0.0.3-dev`` < ``0.0.3``), so
+  the later release bump out of a dev version is a normal strict increase.
 
 The runtime ``continuo.__version__`` is resolved dynamically via
 ``importlib.metadata`` and needs no edit; ``tests/test_smoke.py`` checks
@@ -17,12 +22,17 @@ hard-coded literal, so it needs no edit either.
 
 Usage::
 
-    python scripts/bump-version.py 0.0.2          # apply the bump
-    python scripts/bump-version.py 0.0.2 --check  # dry-run (no writes)
-    python scripts/bump-version.py 0.0.2 --force  # allow downgrade
+    python scripts/bump-version.py 0.0.3          # release bump
+    python scripts/bump-version.py 0.0.3 --check  # dry-run (no writes)
+    python scripts/bump-version.py 0.0.3 --force  # allow downgrade
+    python scripts/bump-version.py --dev          # post-release: -> X.Y.(Z+1)-dev
+    python scripts/bump-version.py 0.1.0 --dev    # dev toward a chosen release: 0.1.0-dev
 
-Once the script returns success: edit ``CHANGELOG.md`` to fill in the new
-entry, then commit and tag (``git tag -a vX.Y.Z -m 'vX.Y.Z'``).
+A typical cycle is: ``--dev`` right after tagging a release, then a release
+bump out of that dev version when the next release is ready.
+
+Once a release bump returns success: edit ``CHANGELOG.md`` to fill in the
+new entry, then commit and tag (``git tag -a vX.Y.Z -m 'vX.Y.Z'``).
 """
 
 from __future__ import annotations
@@ -55,10 +65,26 @@ CHANGELOG_TEMPLATE = """\
 """
 
 
-def parse_version(v: str) -> tuple[int, ...]:
-    """Parse ``X.Y.Z`` (ignoring any pre-release suffix) into a tuple of ints."""
-    core = re.split(r"[+-]", v, maxsplit=1)[0]
-    return tuple(int(x) for x in core.split("."))
+def parse_version(v: str) -> tuple[int, int, int, int]:
+    """Parse ``X.Y.Z[-pre]`` into a sortable key.
+
+    A ``-pre`` suffix (e.g. ``-dev``) sorts *before* the matching ``X.Y.Z``
+    release — the last tuple element is 0 for a pre-release and 1 for a
+    release — so ``0.0.3-dev`` < ``0.0.3`` and a dev-to-release bump is a
+    strict increase. ``+build`` metadata does not lower precedence.
+    """
+    core = re.split(r"[-+]", v, maxsplit=1)[0]
+    major, minor, patch = (int(x) for x in core.split("."))
+    is_prerelease = "-" in v
+    return (major, minor, patch, 0 if is_prerelease else 1)
+
+
+def next_patch_dev(current: str) -> str:
+    """The ``X.Y.(Z+1)-dev`` version following a released ``X.Y.Z``."""
+    major, minor, patch, rank = parse_version(current)
+    if rank == 0:
+        sys.exit(f"bump-version: current version {current!r} is already a dev version")
+    return f"{major}.{minor}.{patch + 1}-dev"
 
 
 def read_current_version() -> str:
@@ -81,18 +107,25 @@ def replace_once(path: Path, old: str, new: str, *, dry_run: bool) -> None:
         path.write_text(text.replace(old, new, 1))
 
 
-def replace_readme_status(path: Path, current: str, new: str, *, dry_run: bool) -> None:
-    """Replace the ``(vX.Y.Z, YYYY-MM-DD)`` segment of the README status line."""
+_README_STATUS_RE = re.compile(r"\(v\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.+-]+)?, \d{4}-\d{2}-\d{2}\)")
+
+
+def replace_readme_status(path: Path, new: str, *, dry_run: bool) -> None:
+    """Replace the ``(vX.Y.Z, YYYY-MM-DD)`` status segment, whatever version it names.
+
+    Matching the *existing* version (rather than the current one) lets a
+    release bump run out of a dev version: the README still shows the prior
+    release (it is not touched by a dev bump), and that is what gets replaced.
+    """
     text = path.read_text()
-    pattern = re.compile(rf"\(v{re.escape(current)}, \d{{4}}-\d{{2}}-\d{{2}}\)")
-    matches = pattern.findall(text)
+    matches = _README_STATUS_RE.findall(text)
     if len(matches) != 1:
         sys.exit(f"bump-version: {path.relative_to(ROOT)}: expected exactly one "
-                 f"'(v{current}, YYYY-MM-DD)', found {len(matches)}")
+                 f"'(vX.Y.Z, YYYY-MM-DD)' status, found {len(matches)}")
     replacement = f"(v{new}, {TODAY})"
     print(f"  {path.relative_to(ROOT)}: {matches[0]!r} -> {replacement!r}")
     if not dry_run:
-        path.write_text(pattern.sub(replacement, text))
+        path.write_text(_README_STATUS_RE.sub(replacement, text))
 
 
 def insert_changelog_entry(path: Path, new: str, *, dry_run: bool) -> None:
@@ -119,26 +152,42 @@ def insert_changelog_entry(path: Path, new: str, *, dry_run: bool) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Bump the continuo version.")
-    ap.add_argument("version", help="the new version (e.g. 0.0.2)")
+    ap.add_argument("version", nargs="?",
+                    help="the new version (e.g. 0.0.3); optional with --dev")
+    ap.add_argument("--dev", action="store_true",
+                    help="post-release dev bump to X.Y.(Z+1)-dev (or <version>-dev); "
+                         "writes pyproject.toml and conf.py only")
     ap.add_argument("--check", action="store_true",
                     help="dry-run: show what would change without writing")
     ap.add_argument("--force", action="store_true",
                     help="allow bumping to a lower or equal version")
     args = ap.parse_args(argv)
 
-    new = args.version
+    current = read_current_version()
+
+    if args.dev:
+        if args.version is not None:
+            if not re.fullmatch(r"\d+\.\d+\.\d+", args.version):
+                sys.exit(f"bump-version: --dev target {args.version!r} must be X.Y.Z (no suffix)")
+            new = f"{args.version}-dev"
+        else:
+            new = next_patch_dev(current)
+    elif args.version is None:
+        sys.exit("bump-version: a version is required (or use --dev)")
+    else:
+        new = args.version
+
     if not SEMVER_RE.match(new):
         sys.exit(f"bump-version: {new!r} is not a valid X.Y.Z[-pre] version")
-
-    current = read_current_version()
     if current == new:
         sys.exit(f"bump-version: version is already {current}")
     if not args.force and parse_version(new) <= parse_version(current):
         sys.exit(f"bump-version: refusing to bump {current} -> {new} "
                  "(not strictly greater; use --force to override)")
 
+    mode = "dev bump" if args.dev else "release"
     suffix = "  (dry run)" if args.check else ""
-    print(f"Bumping {current} -> {new}{suffix}\n")
+    print(f"Bumping {current} -> {new}  [{mode}]{suffix}\n")
 
     replace_once(ROOT / "pyproject.toml",
                  f'version = "{current}"', f'version = "{new}"',
@@ -146,16 +195,21 @@ def main(argv: list[str] | None = None) -> int:
     replace_once(ROOT / "doc/manual/conf.py",
                  f'release = "{current}"', f'release = "{new}"',
                  dry_run=args.check)
-    replace_readme_status(ROOT / "README.md", current, new, dry_run=args.check)
-    insert_changelog_entry(ROOT / "CHANGELOG.md", new, dry_run=args.check)
+    # README and CHANGELOG track releases, not the dev cycle.
+    if not args.dev:
+        replace_readme_status(ROOT / "README.md", new, dry_run=args.check)
+        insert_changelog_entry(ROOT / "CHANGELOG.md", new, dry_run=args.check)
 
     print()
     if args.check:
         print("Dry run complete; re-run without --check to apply.")
+    elif args.dev:
+        print("Dev bump applied (pyproject.toml + conf.py).")
+        print("Reinstall to refresh the reported version: pip install -e .")
     else:
         print("Next steps:")
         print(f"  1. Edit CHANGELOG.md to fill in the {new} entry.")
-        print(f"  2. Verify: pip install -e . && pytest tests/test_smoke.py")
+        print("  2. Verify: pip install -e . && pytest tests/test_smoke.py")
         print(f"  3. Commit: git commit -am 'Release v{new}.'")
         print(f"  4. Tag:    git tag -a v{new} -m 'v{new}'")
     return 0
