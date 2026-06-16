@@ -76,10 +76,14 @@ test:
 # it up directly.
 # ---------------------------------------------------------------------------
 
+# Built on master (the development docs) and on version tags (a release's
+# docs). conf.py reads the version from the package, so the title and the
+# stable/dev banner follow the ref automatically.
 docs:
   stage: docs
   only:
     - master@stepan/continuo
+    - /^v\d+\.\d+\.\d+/@stepan/continuo
   script:
     - pip install --quiet -e ".[docs]"
     - sphinx-build -W --keep-going -b html doc/manual doc/manual/_build/html
@@ -92,16 +96,18 @@ docs:
 
 
 # ---------------------------------------------------------------------------
-# Deploy stage — rsync the built manual to the production directory on
-# the same host (the runner is shell-executor on puck). `--delete` keeps
-# the destination an exact mirror of the build, so renamed/removed pages
-# disappear. `--exclude=/pdf/` protects the sibling pdf/ directory (the
-# nk-nonlinear derivations PDF deployed by deploy_pdf): without it, every
-# docs deploy mirrors the manual over the web root and wipes pdf/ — the
-# bug that made https://continuo.adjemian.eu/pdf/nk-nonlinear.pdf vanish.
+# Deploy stage — rsync the built manual to the production directory on the
+# same host (the runner is shell-executor on puck). Two tracks:
+#   * master      -> /dev/  (the in-development documentation)
+#   * version tag -> /      (the latest released documentation, "stable")
+# `--delete` keeps each destination an exact mirror of its build, so
+# renamed/removed pages disappear. The excludes protect sibling directories
+# the deploy must not own: `/pdf/` (the Beamer PDFs deployed by deploy_pdf —
+# the bug that made https://continuo.adjemian.eu/pdf/nk-nonlinear.pdf vanish)
+# and, for the stable deploy, `/dev/` (the other docs track).
 # ---------------------------------------------------------------------------
 
-deploy_docs:
+deploy_docs_dev:
   stage: deploy
   only:
     - master@stepan/continuo
@@ -109,8 +115,21 @@ deploy_docs:
     - docs
   before_script: []      # no Python venv needed; the job just rsyncs
   script:
+    - mkdir -p /puck/www/continuo.adjemian.eu/dev
+    - rsync -av --delete doc/manual/_build/html/ /puck/www/continuo.adjemian.eu/dev/
+  tags:
+    - stepan@puck
+
+deploy_docs_stable:
+  stage: deploy
+  only:
+    - /^v\d+\.\d+\.\d+/@stepan/continuo
+  needs:
+    - docs
+  before_script: []      # no Python venv needed; the job just rsyncs
+  script:
     - mkdir -p /puck/www/continuo.adjemian.eu
-    - rsync -av --delete --exclude='/pdf/' doc/manual/_build/html/ /puck/www/continuo.adjemian.eu/
+    - rsync -av --delete --exclude='/pdf/' --exclude='/dev/' doc/manual/_build/html/ /puck/www/continuo.adjemian.eu/
   tags:
     - stepan@puck
 

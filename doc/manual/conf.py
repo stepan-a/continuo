@@ -65,6 +65,26 @@ html_theme = "furo"
 html_title = f"continuo {release}"
 html_static_path: list[str] = []
 
+# Two-track docs: ``master`` is published under ``/dev/`` and labels itself
+# with a development version (e.g. ``0.0.3.dev0``); tagged releases are
+# published at the site root. A banner points readers to the other track,
+# chosen from the version string (PEP 440 dev releases contain ``dev``).
+_STABLE_URL = "https://continuo.adjemian.eu/"
+_DEV_URL = "https://continuo.adjemian.eu/dev/"
+if "dev" in release:
+    _announcement = (
+        "You are reading the <strong>development</strong> documentation "
+        f'(<code>master</code>). For the latest release, see the '
+        f'<a href="{_STABLE_URL}">stable documentation</a>.'
+    )
+else:
+    _announcement = (
+        "You are reading the documentation for a released version. The "
+        f'in-development version is in the <a href="{_DEV_URL}">development '
+        "documentation</a>."
+    )
+html_theme_options = {"announcement": _announcement}
+
 # Copy-button: strip the prompt characters when copying.
 copybutton_prompt_text = r">>> |\.\.\. |\$ "
 copybutton_prompt_is_regexp = True
