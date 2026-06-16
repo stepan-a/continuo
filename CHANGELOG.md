@@ -4,6 +4,56 @@ All notable changes to **continuo** are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versioning
 follows [Semantic Versioning](https://semver.org).
 
+## [Unreleased]
+
+### Solver
+
+- Add a pluggable nonlinear solver for the numerical steady state
+  (`solve/rootfind.py`): a `SteadySolver` protocol with a registry
+  (`STEADY_SOLVERS`, `available_steady_solvers`, `select_steady_solver`)
+  mirroring the linear-solver interface. Backends are `newton` (Newton
+  with an Armijo line search), `hybr` / `lm` (MINPACK via SciPy, exact
+  Jacobian), `kinsol` (SUNDIALS KINSOL through CasADi, offered only when
+  the plugin is present), `homotopy` (Newton continuation that rescues a
+  poor initial guess), and the Jacobian-free `broyden` / `krylov` /
+  `df-sane` / `anderson` families. This is the *nonlinear* root-find,
+  distinct from the *linear* backend chosen by `simulate(solver=…)`.
+- Default `steady` solver is `auto`: it tries `hybr` (robust trust-region),
+  then `lm` (least-squares, for a near-singular Jacobian), then `homotopy`
+  (continuation, for a poor initial guess), keeping the first that
+  converges. `newton` stays a selectable preset for its fast quadratic
+  path.
+- The `newton` backend uses an Armijo sufficient-decrease line search on
+  the merit ½‖g‖₂² (rather than accepting any norm decrease), so it no
+  longer crawls on near-zero steps and backtracks cleanly around domain
+  boundaries (e.g. `log`/`^` undefined for negative iterates).
+- Add a `solver=` option to the `steady` directive
+  (`steady(solver=kinsol);`), a `solver=` argument to
+  `Model.steady_state` / `continuo.solve.steady_state`, and a
+  `steady_solver=` argument to `Model.simul` / `simulate` / `solve_pf`
+  governing the internal steady-state solves (terminal anchor and initial
+  state). Precedence is explicit argument > directive > `auto`; unknown
+  names are rejected when the model is read.
+- Add a `--steady-solver` flag to the `continuo` CLI, overriding the
+  directive.
+- Add per-backend solver options, set three ways: an `options` dict
+  on `Model.steady_state` / `steady_state`, an `options={…}` mapping
+  on the `steady` directive, and a repeatable `--steady-solver-option
+  KEY=VALUE` CLI flag (plus `steady_solver_options=` on `Model.simul` /
+  `simulate` / `solve_pf`). Each backend exposes its own knobs —
+  `kinsol`'s `strategy`, `newton`'s `line_search_steps`, `homotopy`'s
+  `steps`, and the SciPy presets' `scipy.optimize.root` options
+  (`factor`, `jac_options`, …). Options require a named solver (`auto`
+  rejects them); unknown options for a named backend raise a clear error.
+
+### Documentation
+
+- Add a "Steady-state solvers" reference page to the manual (backends,
+  presets, `auto` routing, per-backend options, fine control,
+  diagnostics) and document the `steady(solver=…, options={…})`
+  directive, the `--steady-solver` / `--steady-solver-option` flags, and
+  the new API arguments.
+
 ## [0.0.2] — 2026-06-16
 
 ### Solver

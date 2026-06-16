@@ -28,9 +28,16 @@ Numerical fallback
 ------------------
 
 When no ``steady_state_model`` block is present, the steady state is
-computed numerically (Newton on the residual with all time derivatives
-set to zero). For most non-trivial models the analytical block is both
-faster and more robust, and is what the shipped examples use.
+computed numerically: a nonlinear root-find on the residual with all time
+derivatives set to zero. The algorithm is **pluggable** — the default
+``auto`` tries a trust-region hybrid, then least-squares, then a
+continuation method — and is chosen with ``solver=`` on the ``steady``
+directive, the :meth:`continuo.Model.steady_state` API, or the
+``--steady-solver`` CLI flag. See :doc:`/steady_solvers` for the presets
+and how ``auto`` routes.
+
+For most non-trivial models the analytical block is still both faster and
+more robust, and is what the shipped examples use.
 
 How the steady state is used
 ----------------------------

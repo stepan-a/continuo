@@ -59,6 +59,7 @@ specified time (or for a specified exogenous configuration).
    steady;                          // SS at t = T (the terminal SS)
    steady(t = 5);                   // SS at t = 5 under the active exogenous
    steady(t = 0, e = {delta: 0.05});// SS at t = 0 with an explicit override
+   steady(solver = kinsol);         // pick the nonlinear algorithm
 
 Arguments (all keyword, all optional):
 
@@ -68,6 +69,23 @@ Arguments (all keyword, all optional):
 
 ``e`` (mapping ``{varexo: value, …}``)
    Exogenous override. Each key must be a declared ``varexo``.
+
+``solver`` (optional, preset name, default ``auto``)
+   The nonlinear algorithm for the numerical steady-state solve —
+   ``auto`` (default), ``newton``, ``hybr``, ``lm``, ``kinsol``,
+   ``homotopy``, and others. Hyphenated names go in a string:
+   ``solver = "df-sane"``. Unknown names are rejected when the file is
+   read; availability is checked at solve time. The directive sets the
+   algorithm for *every* steady-state solve in the run (the terminal
+   anchor and the initial state too), and an explicit ``solver=`` /
+   ``steady_solver=`` argument on the API or CLI overrides it. See
+   :doc:`/steady_solvers`.
+
+``options`` (optional, mapping, requires ``solver``)
+   Backend-specific options for the chosen solver, e.g.
+   ``options = {strategy: "picard"}`` for ``kinsol`` or
+   ``options = {factor: 0.1}`` for ``hybr``. Values are strings, numbers
+   or bare names. See :doc:`/steady_solvers`.
 
 The Python API exposes the same calculation through
 :meth:`continuo.Model.steady_state`.

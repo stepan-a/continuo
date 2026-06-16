@@ -10,7 +10,9 @@ Synopsis
 
 .. code-block:: console
 
-   continuo MODEL.mod [-o OUTPUT.csv] [-T HORIZON] [-N INTERVALS] [--solver SOLVER]
+   continuo MODEL.mod [-o OUTPUT.csv] [-T HORIZON] [-N INTERVALS]
+            [--solver SOLVER] [--steady-solver SOLVER]
+            [--steady-solver-option KEY=VALUE]
 
 Positional argument
 -------------------
@@ -39,6 +41,17 @@ Options
    ``auto`` (default), ``superlu``, ``klu``, ``klu-nobtf``, ``umfpack``
    or ``pardiso``. An unavailable backend is reported as a clean error.
    See :doc:`solvers`.
+
+``--steady-solver SOLVER``
+   Choose the nonlinear steady-state algorithm, overriding the ``steady``
+   directive — ``auto`` (default), ``newton``, ``hybr``, ``lm``,
+   ``kinsol``, ``homotopy`` and others. See :doc:`steady_solvers`.
+
+``--steady-solver-option KEY=VALUE``
+   Set a backend-specific option for the steady solver; repeatable, e.g.
+   ``--steady-solver-option strategy=picard``. Requires a named
+   ``--steady-solver`` (the default ``auto`` rejects options). Numeric
+   values are coerced. See :doc:`steady_solvers`.
 
 Output format
 -------------
