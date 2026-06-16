@@ -6,7 +6,7 @@
 |------------------------------------------- | -------: | -------: | ------: | --------: |
 | src/continuo/\_\_init\_\_.py               |       11 |        0 |    100% |           |
 | src/continuo/api.py                        |       41 |        0 |    100% |           |
-| src/continuo/cli.py                        |       44 |        1 |     98% |        71 |
+| src/continuo/cli.py                        |       45 |        1 |     98% |        76 |
 | src/continuo/codegen/\_\_init\_\_.py       |        6 |        0 |    100% |           |
 | src/continuo/codegen/errors.py             |       12 |        0 |    100% |           |
 | src/continuo/codegen/native.py             |       45 |        1 |     98% |        95 |
@@ -18,9 +18,9 @@
 | src/continuo/ir/boundary.py                |      105 |       11 |     90% |96, 103, 133, 141, 143, 146-149, 165, 192 |
 | src/continuo/ir/build.py                   |       89 |        0 |    100% |           |
 | src/continuo/ir/classify.py                |       81 |        5 |     94% |85, 87-88, 95, 97 |
-| src/continuo/ir/commands.py                |       72 |        2 |     97% |   79, 108 |
+| src/continuo/ir/commands.py                |       84 |        3 |     96% |89, 111, 139 |
 | src/continuo/ir/errors.py                  |       12 |        0 |    100% |           |
-| src/continuo/ir/model.py                   |       50 |        0 |    100% |           |
+| src/continuo/ir/model.py                   |       51 |        0 |    100% |           |
 | src/continuo/ir/reduce.py                  |       85 |        3 |     96% |94, 101, 117 |
 | src/continuo/ir/shocks.py                  |       66 |        1 |     98% |       108 |
 | src/continuo/ir/steady\_state.py           |       40 |        0 |    100% |           |
@@ -33,16 +33,18 @@
 | src/continuo/parser/ast.py                 |      130 |        0 |    100% |           |
 | src/continuo/parser/errors.py              |        2 |        0 |    100% |           |
 | src/continuo/parser/transform.py           |      126 |        0 |    100% |           |
-| src/continuo/solve/\_\_init\_\_.py         |        7 |        0 |    100% |           |
+| src/continuo/solve/\_\_init\_\_.py         |        8 |        0 |    100% |           |
+| src/continuo/solve/\_klu.py                |      126 |       12 |     90% |82-85, 116-117, 171, 177, 187, 197, 209, 222 |
 | src/continuo/solve/disc/\_\_init\_\_.py    |        4 |        0 |    100% |           |
 | src/continuo/solve/disc/crank\_nicolson.py |       20 |        0 |    100% |           |
 | src/continuo/solve/disc/grid.py            |       21 |        0 |    100% |           |
 | src/continuo/solve/errors.py               |        3 |        0 |    100% |           |
+| src/continuo/solve/linsolve.py             |      201 |       45 |     78% |226-227, 236, 245-248, 264-268, 271-278, 281, 284-286, 289, 292, 301-302, 319-321, 324-326, 329, 332, 335, 340-347, 352-359, 404, 406 |
 | src/continuo/solve/numeric.py              |       23 |        4 |     83% |     38-41 |
-| src/continuo/solve/orchestrator.py         |       96 |        2 |     98% |   205-206 |
-| src/continuo/solve/pf.py                   |      155 |       11 |     93% |195, 222, 224, 235-236, 293, 304-305, 307, 322, 327 |
+| src/continuo/solve/orchestrator.py         |      103 |        2 |     98% |   236-237 |
+| src/continuo/solve/pf.py                   |      195 |       15 |     92% |256, 301, 303, 323-326, 351-352, 409, 420-421, 423, 438, 443 |
 | src/continuo/solve/steady.py               |       81 |        2 |     98% |   137-138 |
-| **TOTAL**                                  | **2646** |   **94** | **96%** |           |
+| **TOTAL**                                  | **3035** |  **156** | **95%** |           |
 
 
 ## Setup coverage badge
