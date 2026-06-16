@@ -1,5 +1,6 @@
 # Continuo
 
+[![release](https://img.shields.io/github/v/release/stepan-a/continuo)](https://github.com/stepan-a/continuo/releases/latest)
 [![tests](https://github.com/stepan-a/continuo/actions/workflows/tests.yml/badge.svg)](https://github.com/stepan-a/continuo/actions/workflows/tests.yml)
 [![coverage](https://raw.githubusercontent.com/stepan-a/continuo/python-coverage-comment-action-data/badge.svg)](https://htmlpreview.github.io/?https://github.com/stepan-a/continuo/blob/python-coverage-comment-action-data/htmlcov/index.html)
 [![GitLab CI](https://git.ithaca.fr/stepan/continuo/badges/master/pipeline.svg?key_text=GitLab%20CI&key_width=62)](https://git.ithaca.fr/stepan/continuo/-/pipelines)
@@ -38,16 +39,28 @@ Lobatto-IIIA), adaptive meshes, and HDF5/parquet output.
 
 ## Installation
 
-No release yet — install from source:
+Continuo is pure Python (≥ 3.13). Install the **latest release** without
+cloning — the wheel is attached to every
+[GitHub release](https://github.com/stepan-a/continuo/releases/latest):
+
+```bash
+pip install https://github.com/stepan-a/continuo/releases/download/v0.0.3/continuo-0.0.3-py3-none-any.whl
+```
+
+With the optional extras for the `Solution` conversion methods
+(`to_dataframe`, `to_xarray`, HDF5 output):
+
+```bash
+pip install "continuo[pandas,xarray,hdf5] @ https://github.com/stepan-a/continuo/releases/download/v0.0.3/continuo-0.0.3-py3-none-any.whl"
+```
+
+To hack on the source, clone and install editable:
 
 ```bash
 git clone https://github.com/stepan-a/continuo
 cd continuo
-pip install -e .
+pip install -e ".[dev]"
 ```
-
-Optional extras for the `Solution` conversion methods (`to_dataframe`,
-`to_xarray`): `pip install -e ".[pandas,xarray,hdf5]"`.
 
 ## Usage
 

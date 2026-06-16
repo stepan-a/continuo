@@ -6,8 +6,9 @@ current version from there and replaces it consistently. Two modes:
 
 - a **release** bump (``X.Y.Z``) touches every version mention:
   ``pyproject.toml`` (``version``), ``doc/manual/conf.py`` (the ``release``
-  fallback), ``README.md`` (the status line ``(vX.Y.Z, YYYY-MM-DD)``) and
-  ``CHANGELOG.md`` (a new ``## [X.Y.Z]`` entry + tag-link footnote);
+  fallback), ``README.md`` (the status line ``(vX.Y.Z, YYYY-MM-DD)`` and the
+  release-wheel install URL) and ``CHANGELOG.md`` (a new ``## [X.Y.Z]`` entry
+  + tag-link footnote);
 - a **dev** bump (``--dev``) marks master as in-development *after* a
   release: it sets ``X.Y.(Z+1)-dev`` (or ``<version>-dev``) in
   ``pyproject.toml`` and ``conf.py`` only. ``README.md`` and ``CHANGELOG.md``
@@ -128,6 +129,27 @@ def replace_readme_status(path: Path, new: str, *, dry_run: bool) -> None:
         path.write_text(_README_STATUS_RE.sub(replacement, text))
 
 
+# The GitHub-release wheel download URL(s) in the README install section. The
+# version appears twice (the ``vX.Y.Z`` tag and the ``continuo-X.Y.Z`` wheel
+# name); both move together. May appear more than once (plain + extras).
+_README_WHEEL_RE = re.compile(
+    r"releases/download/v\d+\.\d+\.\d+/continuo-\d+\.\d+\.\d+-py3-none-any\.whl"
+)
+
+
+def replace_readme_wheel(path: Path, new: str, *, dry_run: bool) -> None:
+    """Point the README's release-wheel URL(s) at ``new`` (release bumps only)."""
+    text = path.read_text()
+    n = len(_README_WHEEL_RE.findall(text))
+    replacement = f"releases/download/v{new}/continuo-{new}-py3-none-any.whl"
+    if n == 0:
+        print(f"  {path.relative_to(ROOT)}: no release-wheel URL found (skipped)")
+        return
+    print(f"  {path.relative_to(ROOT)}: {n} wheel URL(s) -> v{new}")
+    if not dry_run:
+        path.write_text(_README_WHEEL_RE.sub(replacement, text))
+
+
 def insert_changelog_entry(path: Path, new: str, *, dry_run: bool) -> None:
     """Insert a new entry template at the top, and a matching tag-link footnote."""
     text = path.read_text()
@@ -198,6 +220,7 @@ def main(argv: list[str] | None = None) -> int:
     # README and CHANGELOG track releases, not the dev cycle.
     if not args.dev:
         replace_readme_status(ROOT / "README.md", new, dry_run=args.check)
+        replace_readme_wheel(ROOT / "README.md", new, dry_run=args.check)
         insert_changelog_entry(ROOT / "CHANGELOG.md", new, dry_run=args.check)
 
     print()
