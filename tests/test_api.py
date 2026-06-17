@@ -82,6 +82,16 @@ def test_simul_reads_the_command_and_overrides():
     assert model.simul(horizon=2.0, intervals=4).t[-1] == pytest.approx(2.0)
 
 
+def test_simul_scheme_and_order_override():
+    model = continuo.parse_string(SADDLE)
+    sol = model.simul(scheme="radau", order=5)
+    assert sol.diagnostics["scheme"] == "radau"
+    assert sol["x"][0] == pytest.approx(1.0)
+    # A bad order for the family surfaces as a clean SolveError.
+    with pytest.raises(SolveError, match="order"):
+        model.simul(scheme="gauss", order=3)
+
+
 def test_steady_state():
     ss = continuo.parse_string(RBC).steady_state(exogenous={"z": 1.0})
     # K* = (alpha z / (rho + delta))^(1/(1-alpha))

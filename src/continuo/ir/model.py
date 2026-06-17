@@ -58,13 +58,17 @@ class Simulation:
     """A perfect-foresight run: horizon T, grid intervals N, scheme, and solver.
 
     ``solver`` is the linear-solver preset named in the directive (``None``
-    when unspecified, leaving the choice to ``auto`` / the caller).
+    when unspecified, leaving the choice to ``auto`` / the caller). ``order``
+    is the collocation order for the multi-stage schemes (``None`` when
+    unspecified, taking the family default; always ``None`` for
+    ``crank_nicolson``).
     """
 
     horizon: Expr
     grid: Expr
     scheme: str
     solver: str | None = None
+    order: int | None = None
 
 
 @dataclass(frozen=True)

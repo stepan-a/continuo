@@ -86,8 +86,8 @@ def simulate(
     ``options={…}``.
     """
     theta = evaluate_parameters(model)
-    horizon, intervals, scheme, solver = _resolve_command(
-        model, theta, horizon, intervals, scheme, solver
+    horizon, intervals, scheme, order, solver = _resolve_command(
+        model, theta, horizon, intervals, scheme, order, solver
     )
     if steady_solver is None:
         steady_solver = directive_solver(model)
@@ -202,11 +202,12 @@ def _resolve_command(
     horizon: float | None,
     intervals: int | None,
     scheme: str | None,
+    order: int | None,
     solver: str | LinearSolver | None,
-) -> tuple[float, int, str, str | LinearSolver | None]:
-    # Precedence for scheme/solver: explicit argument > simulate directive > default.
+) -> tuple[float, int, str, int | None, str | LinearSolver | None]:
+    # Precedence for scheme/order/solver: explicit argument > simulate directive > default.
     if horizon is not None and intervals is not None:
-        return float(horizon), int(intervals), scheme or _DEFAULT_SCHEME, solver
+        return float(horizon), int(intervals), scheme or _DEFAULT_SCHEME, order, solver
     if not model.simulations:
         raise SolveError("no simulate command in the model; pass horizon and intervals")
     command = model.simulations[0]
@@ -214,7 +215,8 @@ def _resolve_command(
     t = eval_constant(command.horizon, table, what="simulate horizon T")
     n = eval_constant(command.grid, table, what="simulate grid N")
     chosen_solver = solver if solver is not None else command.solver
-    return float(t), int(n), scheme or command.scheme, chosen_solver
+    chosen_order = order if order is not None else command.order
+    return float(t), int(n), scheme or command.scheme, chosen_order, chosen_solver
 
 
 def _schedule(

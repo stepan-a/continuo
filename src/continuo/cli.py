@@ -36,6 +36,8 @@ def main(argv: list[str] | None = None) -> int:
         solution = model.simul(
             horizon=args.horizon,
             intervals=args.intervals,
+            scheme=args.scheme,
+            order=args.order,
             solver=args.solver,
             steady_solver=args.steady_solver,
             steady_solver_options=_parse_options(args.steady_solver_option),
@@ -62,6 +64,16 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("-o", "--output", help="output CSV file (default: <model>.csv)")
     parser.add_argument("-T", "--horizon", type=float, help="override the simulation horizon T")
     parser.add_argument("-N", "--intervals", type=int, help="override the grid resolution N")
+    parser.add_argument(
+        "--scheme",
+        help="discretisation scheme, overriding the simulate directive "
+        "(crank_nicolson, gauss, radau, lobatto_iiia)",
+    )
+    parser.add_argument(
+        "--order",
+        type=int,
+        help="collocation order for a multi-stage scheme (e.g. --scheme radau --order 5)",
+    )
     parser.add_argument(
         "--solver",
         help="linear solver backend, overriding the simulate directive "

@@ -113,25 +113,29 @@ class Model:
         horizon: float | None = None,
         intervals: int | None = None,
         scheme: str | None = None,
+        order: int | None = None,
         solver: str | LinearSolver | None = None,
         steady_solver: str | SteadySolver | None = None,
         steady_solver_options: dict[str, object] | None = None,
     ) -> Solution:
         """Run the perfect-foresight simulation, returning a :class:`Solution`.
 
-        ``horizon`` / ``intervals`` / ``scheme`` override the model's
-        ``simulate`` command. ``solver`` selects the linear backend: a
-        preset name (``"superlu"``, ``"auto"``), a :class:`LinearSolver`
-        instance, or ``None`` (the ``"auto"`` default). ``steady_solver``
-        selects the nonlinear algorithm for the internal steady-state solves,
-        overriding the ``steady(solver=…)`` directive, and
-        ``steady_solver_options`` configures it.
+        ``horizon`` / ``intervals`` / ``scheme`` / ``order`` override the
+        model's ``simulate`` command; ``order`` selects the collocation order
+        of a multi-stage ``scheme`` (the family default when ``None``).
+        ``solver`` selects the linear backend: a preset name (``"superlu"``,
+        ``"auto"``), a :class:`LinearSolver` instance, or ``None`` (the
+        ``"auto"`` default). ``steady_solver`` selects the nonlinear algorithm
+        for the internal steady-state solves, overriding the
+        ``steady(solver=…)`` directive, and ``steady_solver_options``
+        configures it.
         """
         return simulate(
             self._model,
             horizon=horizon,
             intervals=intervals,
             scheme=scheme,
+            order=order,
             solver=solver,
             steady_solver=steady_solver,
             steady_solver_options=steady_solver_options,

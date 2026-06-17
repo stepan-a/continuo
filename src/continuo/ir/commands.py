@@ -34,10 +34,18 @@ from continuo.parser.ast import (
 
 __all__ = ["attach_commands"]
 
-# Discretisation schemes the language recognises (not all are implemented
-# in the solver yet); validating against the set catches typos.
-_SCHEMES = {"crank_nicolson", "radau", "sdirk", "lobatto_iiia"}
+# Discretisation schemes the language recognises; validating against the set
+# catches typos. Mirrors continuo.solve.disc.SCHEMES.
+_SCHEMES = {"crank_nicolson", "gauss", "radau", "lobatto_iiia"}
 _DEFAULT_SCHEME = "crank_nicolson"
+
+# Collocation orders each family provides (mirrors solve.disc.SCHEME_ORDERS);
+# crank_nicolson is fixed second-order and takes no order argument.
+_SCHEME_ORDERS = {
+    "gauss": {2, 4, 6},
+    "radau": {1, 3, 5},
+    "lobatto_iiia": {2, 4, 6},
+}
 
 # Linear-solver presets the simulate directive recognises (mirrors
 # solve.SOLVERS plus "auto"); availability is checked at solve time.
@@ -87,18 +95,20 @@ def attach_commands(model: Model, model_file: ModelFile) -> Model:
 def _simulate(cmd: SimulateCommand) -> Simulation:
     if cmd.args:
         raise IRError("simulate takes keyword arguments only (T=…, N=…)", cmd.pos)
-    options = _collect(cmd.kwargs, allowed=("T", "N", "scheme", "solver"), what="simulate")
+    options = _collect(cmd.kwargs, allowed=("T", "N", "scheme", "solver", "order"), what="simulate")
     if "T" not in options:
         raise IRError("simulate requires the horizon T", cmd.pos)
     if "N" not in options:
         raise IRError("simulate requires the grid resolution N", cmd.pos)
     _check_positive("T", options["T"], integer=False)
     _check_positive("N", options["N"], integer=True)
+    scheme = _scheme(options.get("scheme"))
     return Simulation(
         options["T"],
         options["N"],
-        _scheme(options.get("scheme")),
+        scheme,
         _solver(options.get("solver")),
+        _order(scheme, options.get("order")),
     )
 
 
@@ -117,6 +127,29 @@ def _scheme(value: Expr | None) -> str:
             value.pos,
         )
     return value.name
+
+
+def _order(scheme: str, value: Expr | None) -> int | None:
+    """The collocation order for ``scheme``; ``None`` when unspecified (family default)."""
+    if value is None:
+        return None
+    n = _literal(value)
+    if n is None or n <= 0 or n != int(n):
+        raise IRError("simulate order must be a positive integer", getattr(value, "pos", None))
+    if scheme == "crank_nicolson":
+        raise IRError(
+            "crank_nicolson is fixed second-order and takes no order; use "
+            "scheme=gauss / radau / lobatto_iiia to choose an order",
+            getattr(value, "pos", None),
+        )
+    allowed = _SCHEME_ORDERS[scheme]
+    if int(n) not in allowed:
+        raise IRError(
+            f"{scheme} supports order in {{{', '.join(str(o) for o in sorted(allowed))}}}, "
+            f"got {int(n)}",
+            getattr(value, "pos", None),
+        )
+    return int(n)
 
 
 def _solver(value: Expr | None) -> str | None:

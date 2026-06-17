@@ -39,6 +39,41 @@ def test_simulate_scheme_override():
     assert m.simulations[0].scheme == "radau"
 
 
+def test_simulate_gauss_scheme_accepted():
+    assert ir("simulate(T=200, N=400, scheme=gauss);").simulations[0].scheme == "gauss"
+
+
+def test_simulate_rejects_removed_sdirk_scheme():
+    with pytest.raises(IRError, match="unknown discretisation scheme 'sdirk'"):
+        ir("simulate(T=200, N=400, scheme=sdirk);")
+
+
+# --- collocation order ----------------------------------------------------
+
+
+def test_simulate_order_defaults_to_none():
+    assert ir("simulate(T=200, N=400, scheme=radau);").simulations[0].order is None
+
+
+def test_simulate_order_parsed():
+    assert ir("simulate(T=200, N=400, scheme=radau, order=5);").simulations[0].order == 5
+
+
+def test_simulate_order_rejected_for_crank_nicolson():
+    with pytest.raises(IRError, match="crank_nicolson is fixed second-order"):
+        ir("simulate(T=200, N=400, order=4);")
+
+
+def test_simulate_order_rejected_outside_family_set():
+    with pytest.raises(IRError, match=r"gauss supports order in \{2, 4, 6\}"):
+        ir("simulate(T=200, N=400, scheme=gauss, order=3);")
+
+
+def test_simulate_order_must_be_positive_integer():
+    with pytest.raises(IRError, match="order must be a positive integer"):
+        ir("simulate(T=200, N=400, scheme=radau, order=2.5);")
+
+
 def test_simulate_solver_defaults_to_none():
     assert ir("simulate(T=200, N=400);").simulations[0].solver is None
 
