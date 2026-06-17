@@ -33,7 +33,12 @@ from continuo.codegen.translate import SymbolTable
 from continuo.ir.model import Model
 from continuo.solve.errors import SolveError
 from continuo.solve.numeric import constant_table, eval_constant
-from continuo.solve.rootfind import RootProblem, SteadySolver, select_steady_solver
+from continuo.solve.rootfind import RootProblem, RootResult, SteadySolver, select_steady_solver
+from continuo.solve.transform import (
+    VarTransform,
+    build_constrained_problem,
+    build_transforms,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -148,6 +153,35 @@ def _numerical(
     e_vec = _vector(e.get(name, 0.0) for name in model.exogenous)
     xdot_zero = ca.DM.zeros(len(model.states) + len(model.jumps), 1)
 
+    if model.constraints:
+        # Reparametrise: solve in the unconstrained y, keeping x = T(y) strictly
+        # inside its declared domain, then map the solution back to x.
+        transforms = build_transforms(model, theta, e)
+        y0 = _starting_iterate_y(model, theta, e, guess, transforms)
+        problem, untransform = build_constrained_problem(
+            residual, xdot_zero, e_vec, theta_vec, transforms, y0
+        )
+        result = _run(problem, solver, options, tol, max_iter)
+        return dict(zip(endogenous, untransform(result.x).tolist(), strict=True))
+
+    problem = _plain_problem(model, residual, xdot_zero, e_vec, theta_vec, theta, e, guess)
+    result = _run(problem, solver, options, tol, max_iter)
+    return dict(zip(endogenous, result.x.tolist(), strict=True))
+
+
+def _plain_problem(
+    model: Model,
+    residual,
+    xdot_zero: ca.DM,
+    e_vec: ca.DM,
+    theta_vec: ca.DM,
+    theta: dict[str, float],
+    e: dict[str, float],
+    guess: dict[str, float] | None,
+) -> RootProblem:
+    """The unconstrained steady-state root problem, solved directly in ``x``."""
+    endogenous = model.endogenous
+
     def g(x: np.ndarray) -> np.ndarray:
         out = residual.function(xdot_zero, ca.DM(x), e_vec, theta_vec, 0.0)
         return np.array(out).reshape(-1)
@@ -156,14 +190,23 @@ def _numerical(
         out = residual.jacobian_x(xdot_zero, ca.DM(x), e_vec, theta_vec, 0.0)
         return np.array(out)
 
-    x0 = _starting_iterate(model, theta, e, guess)
-    problem = RootProblem(
+    return RootProblem(
         g,
         jac,
-        x0,
+        _starting_iterate(model, theta, e, guess),
         residual_function=_residual_of_x(residual, xdot_zero, e_vec, theta_vec, len(endogenous)),
         names=tuple(endogenous),
     )
+
+
+def _run(
+    problem: RootProblem,
+    solver: str | SteadySolver | None,
+    options: dict[str, Any] | None,
+    tol: float,
+    max_iter: int,
+) -> RootResult:
+    """Select the backend, solve, and report — shared by both paths."""
     backend = select_steady_solver(solver, options=options)
     result = backend.solve(problem, tol=tol, max_iter=max_iter)
     if not result.success:
@@ -177,7 +220,7 @@ def _numerical(
         result.iterations,
         result.residual_norm,
     )
-    return dict(zip(endogenous, result.x.tolist(), strict=True))
+    return result
 
 
 def _residual_of_x(
@@ -200,6 +243,38 @@ def _starting_iterate(
     if guess:
         values.update(guess)
     return np.array([values.get(name, 1.0) for name in model.endogenous], dtype=float)
+
+
+def _starting_iterate_y(
+    model: Model,
+    theta: dict[str, float],
+    e: dict[str, float],
+    guess: dict[str, float] | None,
+    transforms: list[VarTransform],
+) -> np.ndarray:
+    """Starting iterate in ``y``-space, aligned with ``transforms``.
+
+    An explicit guess (from ``initial_guess`` or the caller) is mapped
+    through ``T⁻¹`` — which validates it is strictly interior. Otherwise a
+    constrained variable starts at ``y = 0`` (the interior point ``T(0)``)
+    and an unconstrained one at ``1.0``, matching the plain path's default.
+    """
+    values: dict[str, float] = {}
+    if model.initial_guess:
+        table = constant_table(theta, e, model)
+        for name, expr in model.initial_guess.items():
+            values[name] = eval_constant(expr, table, what=f"initial_guess for {name!r}")
+    if guess:
+        values.update(guess)
+    y0 = np.empty(len(transforms), dtype=float)
+    for i, transform in enumerate(transforms):
+        if transform.name in values:
+            y0[i] = transform.inverse(values[transform.name])
+        elif transform.constrained:
+            y0[i] = 0.0
+        else:
+            y0[i] = 1.0
+    return y0
 
 
 # ---------------------------------------------------------------------------

@@ -146,6 +146,85 @@ def test_directive_solver_is_none_when_absent():
     assert directive_solver(model(LINEAR)) is None
 
 
+# --- constrained steady state (change of variable) ------------------------
+
+# A power-law model whose economically meaningful root is interior:
+# diff(K) = Y - delta*K, Y = K^alpha  ->  K = delta^(1/(alpha-1)) ~ 26.8.
+# It also has a spurious root at K = 0 that the unconstrained solve drifts
+# to from the default guess; bounding K away from 0 steers to the real one.
+CONSTRAINED = (
+    "var(state, boundaries=(0.5, 1000)) K;\n"
+    "var(positive) Y;\n"
+    "parameters alpha, delta;\n"
+    "alpha = 0.3;\ndelta = 0.1;\n"
+    "model;\n  diff(K) = Y - delta * K;\n  Y = K^alpha;\nend;\n"
+)
+K_STAR = 0.1 ** (1 / (0.3 - 1))
+
+
+def test_constrained_converges_without_initial_guess():
+    # The phare: bounds alone steer the default-guess solve to the analytical
+    # value, with no initial_guess block.
+    ss = steady_state(model(CONSTRAINED))
+    assert ss["K"] == pytest.approx(K_STAR, rel=1e-6)
+    assert ss["Y"] == pytest.approx(K_STAR**0.3, rel=1e-6)
+
+
+def test_unconstrained_same_model_misses_the_interior_root():
+    # Without the constraint, the default guess drifts to the K≈0 root.
+    src = CONSTRAINED.replace("(state, boundaries=(0.5, 1000))", "(state)").replace(
+        "var(positive) Y;", "var Y;"
+    )
+    assert steady_state(model(src))["K"] != pytest.approx(K_STAR, rel=1e-3)
+
+
+def test_constrained_one_sided_lower_bound():
+    # K^alpha = 2  ->  K = 2^(1/alpha); a unique positive root, no K=0 root.
+    src = (
+        "var(state, positive) K;\nvar Y;\nparameters alpha;\nalpha = 0.3;\n"
+        "model;\n  diff(K) = 2 - Y;\n  Y = K^alpha;\nend;"
+    )
+    assert steady_state(model(src))["K"] == pytest.approx(2 ** (1 / 0.3), rel=1e-6)
+
+
+def test_constrained_parameter_bound():
+    src = (
+        CONSTRAINED.replace("boundaries=(0.5, 1000)", "boundaries=(0.5, kmax)")
+        .replace("parameters alpha, delta;", "parameters alpha, delta, kmax;")
+        .replace("delta = 0.1;", "delta = 0.1;\nkmax = 1000;")
+    )
+    assert steady_state(model(src))["K"] == pytest.approx(K_STAR, rel=1e-6)
+
+
+def test_constrained_guess_out_of_domain_rejected():
+    with pytest.raises(SolveError, match="outside"):
+        steady_state(model(CONSTRAINED), guess={"K": 2000.0})
+
+
+def test_constraints_are_inert_with_analytical_steady_state():
+    # An analytical steady_state_model wins; the constraints are validated
+    # but unused (closed form, no change of variable).
+    src = CONSTRAINED + (
+        "steady_state_model;\n  K = delta^(1 / (alpha - 1));\n  Y = K^alpha;\nend;"
+    )
+    ss = steady_state(model(src))
+    assert ss["K"] == pytest.approx(K_STAR, rel=1e-12)
+
+
+@pytest.mark.parametrize("solver", ["newton", "hybr", "kinsol"])
+def test_constrained_across_backends(solver):
+    # Each backend must solve in y-space and recover K*; an initial_guess
+    # isolates "the change of variable composes with this backend" from the
+    # harder question of robustness from a far midpoint start.
+    from continuo.solve.rootfind import available_steady_solvers
+
+    if solver not in available_steady_solvers():
+        pytest.skip(f"{solver} backend unavailable")
+    src = CONSTRAINED + "initial_guess;\n  K = 20;\n  Y = 2.5;\nend;"
+    ss = steady_state(model(src), solver=solver)
+    assert ss["K"] == pytest.approx(K_STAR, rel=1e-6)
+
+
 def test_higher_order_auxiliary_steady_state_is_zero():
     src = (
         "var(state) x;\nvar Y;\n"
