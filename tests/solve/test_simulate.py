@@ -234,9 +234,18 @@ def test_reveal_snapped_to_grid_index_zero_does_not_create_extra_segment():
 
 
 def test_unimplemented_scheme_rejected():
-    src = SADDLE + "simulate(T=2, N=4, scheme=radau);"
+    # sdirk parses (it is in the grammar) but has no discretisation yet.
+    src = SADDLE + "simulate(T=2, N=4, scheme=sdirk);"
     with pytest.raises(SolveError, match="not implemented"):
         simulate(model(src))
+
+
+def test_collocation_scheme_runs_from_the_directive():
+    # A directive scheme that is now implemented solves end to end.
+    src = SADDLE + "simulate(T=2, N=8, scheme=radau);"
+    sol = simulate(model(src))
+    assert sol.diagnostics["scheme"] == "radau"
+    assert sol["x"][0] == pytest.approx(1.0)
 
 
 # --- linear-solver selection ----------------------------------------------

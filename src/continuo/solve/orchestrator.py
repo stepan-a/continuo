@@ -34,7 +34,7 @@ from continuo.codegen.translate import SymbolTable, translate
 from continuo.io.solution import Segment, Solution
 from continuo.ir.model import Model
 from continuo.parser.ast import Expr
-from continuo.solve.disc import uniform_grid
+from continuo.solve.disc import SCHEMES, uniform_grid
 from continuo.solve.errors import SolveError
 from continuo.solve.linsolve import LinearSolver, select_solver
 from continuo.solve.numeric import constant_table, eval_constant
@@ -49,11 +49,12 @@ from continuo.solve.steady import (
 
 __all__ = ["simulate"]
 
-_SUPPORTED_SCHEME = "crank_nicolson"
+_DEFAULT_SCHEME = "crank_nicolson"
 
 # Coupling stencil each scheme generates, which guides ``solver="auto"``:
-# one-step schemes (CN, collocation/IRK) yield a block-triangular Jacobian.
-_STENCIL = {"crank_nicolson": "one-step"}
+# CN and the collocation families are all one-step (each interval couples only
+# its endpoints and its own stages), so the stacked Jacobian is block-triangular.
+_STENCIL = dict.fromkeys(SCHEMES, "one-step")
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +65,7 @@ def simulate(
     horizon: float | None = None,
     intervals: int | None = None,
     scheme: str | None = None,
+    order: int | None = None,
     solver: str | LinearSolver | None = None,
     steady_solver: str | SteadySolver | None = None,
     steady_solver_options: dict[str, object] | None = None,
@@ -72,7 +74,9 @@ def simulate(
 
     ``horizon`` / ``intervals`` / ``scheme`` override the ``simulate``
     command; if both ``horizon`` and ``intervals`` are omitted the command
-    must supply them. ``solver`` selects the linear backend (preset name,
+    must supply them. ``order`` selects the collocation order for the
+    multi-stage families (ignored by ``crank_nicolson``; the family default
+    is used when ``None``). ``solver`` selects the linear backend (preset name,
     :class:`LinearSolver` instance, or the ``"auto"`` default).
     ``steady_solver`` selects the nonlinear algorithm for the internal
     steady-state solves (the terminal anchor and the initial state),
@@ -92,7 +96,7 @@ def simulate(
     # Resolve the steady backend once (validates name/options) and reuse the
     # instance for every internal steady-state solve.
     steady_backend = select_steady_solver(steady_solver, options=steady_solver_options)
-    if scheme != _SUPPORTED_SCHEME:
+    if scheme not in SCHEMES:
         raise SolveError(f"discretisation scheme {scheme!r} is not implemented yet")
     # One backend for the whole run; auto routes by the scheme's coupling stencil.
     linear = select_solver(solver, stencil=_STENCIL[scheme])
@@ -144,6 +148,8 @@ def simulate(
             terminal_jumps=terminal_jumps,
             guess=guess,
             solver=linear,
+            scheme=scheme,
+            order=order,
             sym=sym,
             num=num,
             stats=stats,
@@ -200,7 +206,7 @@ def _resolve_command(
 ) -> tuple[float, int, str, str | LinearSolver | None]:
     # Precedence for scheme/solver: explicit argument > simulate directive > default.
     if horizon is not None and intervals is not None:
-        return float(horizon), int(intervals), scheme or _SUPPORTED_SCHEME, solver
+        return float(horizon), int(intervals), scheme or _DEFAULT_SCHEME, solver
     if not model.simulations:
         raise SolveError("no simulate command in the model; pass horizon and intervals")
     command = model.simulations[0]

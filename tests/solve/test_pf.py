@@ -211,3 +211,82 @@ def test_missing_initval_rejected():
     src = "var(state) x;\nvar(jump) y;\nmodel;\n  diff(x) = -x;\n  diff(y) = y;\nend;"
     with pytest.raises(SolveError, match="no initial value"):
         solve_pf(model(src), horizon=2.0, intervals=4)
+
+
+# --- collocation schemes --------------------------------------------------
+
+# A linear scalar IVP with the analytic solution K(t) = exp(lam*t).
+_LAM = -0.7
+DECAY = f"""
+var(state) K;
+parameters lam;
+lam = {_LAM};
+model;
+  diff(K) = lam * K;
+end;
+initval;
+  K = 1.0;
+end;
+"""
+
+
+def _max_error(scheme: str, order: int | None, intervals: int, horizon: float) -> float:
+    sol = solve_pf(model(DECAY), horizon=horizon, intervals=intervals, scheme=scheme, order=order)
+    return float(np.max(np.abs(sol["K"] - np.exp(_LAM * sol.t))))
+
+
+@pytest.mark.parametrize(
+    "scheme,order,expected",
+    [
+        ("crank_nicolson", None, 2),
+        ("gauss", 4, 4),
+        ("gauss", 6, 6),
+        ("radau", 3, 3),
+        ("radau", 5, 5),
+        ("lobatto_iiia", 4, 4),
+    ],
+)
+def test_collocation_convergence_order(scheme, order, expected):
+    # Halving dt should cut the error by ~2**order; measure the rate on the
+    # finer pair (well inside the asymptotic regime, above the round-off floor).
+    horizon = 2.0
+    base = 4 if expected <= 4 else 3
+    errors = [_max_error(scheme, order, base * k, horizon) for k in (1, 2, 4)]
+    rate = np.log2(errors[1] / errors[2])
+    assert rate == pytest.approx(expected, abs=0.5)
+
+
+def test_collocation_matches_crank_nicolson_on_a_nonlinear_model():
+    # A nonlinear RBC transition: every scheme agrees with CN at a fine grid.
+    src = """
+    var(state) K;
+    var(jump) C;
+    parameters rho, alpha, delta;
+    rho = 0.03;
+    alpha = 0.33;
+    delta = 0.1;
+    model;
+      diff(K) = K^alpha - delta * K - C;
+      diff(C) = C * (alpha * K^(alpha - 1) - delta - rho);
+    end;
+    initval;
+      K = 0.8 * steady_state(K);
+    end;
+    """
+    m = model(src)
+    ref = solve_pf(m, horizon=40.0, intervals=400)
+    for scheme in ("gauss", "radau", "lobatto_iiia"):
+        sol = solve_pf(m, horizon=40.0, intervals=400, scheme=scheme)
+        assert np.max(np.abs(sol["K"] - ref["K"])) < 1e-4
+        assert np.max(np.abs(sol["C"] - ref["C"])) < 1e-4
+
+
+def test_collocation_solution_has_node_shape():
+    # The returned path is the node block only; stage unknowns are dropped.
+    sol = solve_pf(model(DECAY), horizon=2.0, intervals=10, scheme="radau", order=5)
+    assert sol.path.shape == (11, 1)
+
+
+def test_unsupported_order_rejected():
+    with pytest.raises(SolveError, match="order"):
+        solve_pf(model(DECAY), horizon=2.0, intervals=10, scheme="gauss", order=3)
