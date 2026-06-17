@@ -1,16 +1,18 @@
-"""Tests for the uniform time grid."""
+"""Tests for the time grid (uniform and non-uniform)."""
 
 from __future__ import annotations
 
+import numpy as np
 import pytest
 
 from continuo.solve import SolveError
-from continuo.solve.disc import uniform_grid
+from continuo.solve.disc import mesh_from_points, uniform_grid
 
 
 def test_uniform_grid_layout():
     grid = uniform_grid(10.0, 5)
     assert grid.dt == pytest.approx(2.0)
+    assert grid.steps == pytest.approx(np.full(5, 2.0))
     assert len(grid.points) == 6
     assert grid.points[0] == pytest.approx(0.0)
     assert grid.points[-1] == pytest.approx(10.0)
@@ -33,3 +35,29 @@ def test_non_positive_horizon_rejected():
 def test_zero_intervals_rejected():
     with pytest.raises(SolveError, match="at least 1"):
         uniform_grid(10.0, 0)
+
+
+# --- non-uniform meshes ---------------------------------------------------
+
+
+def test_mesh_from_points_derives_steps_and_midpoints():
+    grid = mesh_from_points([0.0, 1.0, 3.0, 6.0])
+    assert grid.intervals == 3
+    assert grid.steps == pytest.approx([1.0, 2.0, 3.0])
+    assert grid.midpoints == pytest.approx([0.5, 2.0, 4.5])
+
+
+def test_non_uniform_grid_has_no_single_dt():
+    grid = mesh_from_points([0.0, 1.0, 3.0])
+    with pytest.raises(ValueError, match="no single dt"):
+        _ = grid.dt
+
+
+def test_mesh_rejects_non_increasing_points():
+    with pytest.raises(SolveError, match="strictly increasing"):
+        mesh_from_points([0.0, 2.0, 1.0])
+
+
+def test_mesh_rejects_too_few_points():
+    with pytest.raises(SolveError, match="at least two points"):
+        mesh_from_points([0.0])

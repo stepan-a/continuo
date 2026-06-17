@@ -9,9 +9,13 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from continuo.codegen.residual import build_residual
 from continuo.ir import build
 from continuo.parser import parse
 from continuo.solve import SolveError, solve_pf
+from continuo.solve.disc import mesh_from_points
+from continuo.solve.pf import solve_segment
+from continuo.solve.steady import evaluate_parameters
 
 
 def model(src: str):
@@ -290,3 +294,31 @@ def test_collocation_solution_has_node_shape():
 def test_unsupported_order_rejected():
     with pytest.raises(SolveError, match="order"):
         solve_pf(model(DECAY), horizon=2.0, intervals=10, scheme="gauss", order=3)
+
+
+# --- non-uniform grid -----------------------------------------------------
+
+
+@pytest.mark.parametrize("scheme,order", [("crank_nicolson", None), ("radau", 5)])
+def test_non_uniform_grid_solves_pure_ode(scheme, order):
+    # A graded mesh (dense near t=0) must still recover K(t) = exp(lam*t).
+    m = model(DECAY)
+    residual = build_residual(m)
+    theta = evaluate_parameters(m)
+    t_horizon = 2.0
+    grid = mesh_from_points(t_horizon * np.linspace(0.0, 1.0, 21) ** 2)
+    assert grid.steps.max() > 3 * grid.steps.min()  # genuinely non-uniform
+    path, _iters, _sym, _num = solve_segment(
+        m,
+        residual,
+        grid,
+        theta=theta,
+        exogenous_at=lambda _t: {},
+        initial_states={"K": 1.0},
+        terminal_jumps={},
+        guess=np.ones((grid.intervals + 1, 1)),
+        scheme=scheme,
+        order=order,
+    )
+    exact = np.exp(_LAM * grid.points)
+    assert np.max(np.abs(path[:, 0] - exact)) < 1e-3

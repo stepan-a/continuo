@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from continuo.solve.disc.collocation import collocation_residual
 from continuo.solve.disc.crank_nicolson import crank_nicolson_residual
-from continuo.solve.disc.grid import Grid, uniform_grid
+from continuo.solve.disc.grid import Grid, mesh_from_points, uniform_grid
 from continuo.solve.disc.tableaux import (
     SCHEME_ORDERS,
     ButcherTableau,
@@ -32,6 +32,7 @@ SCHEMES = ("crank_nicolson", "gauss", "radau", "lobatto_iiia")
 
 __all__ = [
     "uniform_grid",
+    "mesh_from_points",
     "Grid",
     "crank_nicolson_residual",
     "collocation_residual",

@@ -265,10 +265,12 @@ def _build_system(
         dynamic_rows, _ = _row_split(residual, model)
         X = ca.SX.sym("X", n * points)
         interval_rows: list[ca.SX] = []
+        midpoints = grid.midpoints
+        steps = grid.steps
         for i in range(grid.intervals):
-            t_mid = grid.midpoints[i]
+            t_mid = midpoints[i]
             midpoint = interval(
-                _block(X, n, i), _block(X, n, i + 1), exogenous(t_mid), theta, t_mid, grid.dt
+                _block(X, n, i), _block(X, n, i + 1), exogenous(t_mid), theta, t_mid, steps[i]
             )
             interval_rows.extend(midpoint[r] for r in dynamic_rows)
     else:
@@ -279,15 +281,17 @@ def _build_system(
         n_algebraic = n - n_dynamic
         offset = n * points  # start of the stage block
         X = ca.SX.sym("X", offset + grid.intervals * s * n)
+        steps = grid.steps
         interval_rows = []
         for i in range(grid.intervals):
             t_i = grid.points[i]
+            step = steps[i]
             stages = [X[offset + (i * s + j) * n : offset + (i * s + j) * n + n] for j in range(s)]
             v = ca.vertcat(*(st[:n_dynamic] for st in stages))
             w = ca.vertcat(*(st[n_dynamic:] for st in stages)) if n_algebraic else ca.DM.zeros(0, 1)
-            e = ca.vertcat(*(exogenous(t_i + nodes[j] * grid.dt) for j in range(s)))
+            e = ca.vertcat(*(exogenous(t_i + nodes[j] * step) for j in range(s)))
             interval_rows.append(
-                interval(_block(X, n, i), _block(X, n, i + 1), v, w, e, theta, t_i, grid.dt)
+                interval(_block(X, n, i), _block(X, n, i + 1), v, w, e, theta, t_i, step)
             )
 
     rows: list[ca.SX] = list(interval_rows)
@@ -332,10 +336,11 @@ def _stage_seed(guess: np.ndarray, grid: Grid, tableau, n_dynamic: int) -> np.nd
     match the stage block of ``X``.
     """
     s = tableau.stages
+    steps = grid.steps
     seeds: list[np.ndarray] = []
     for i in range(grid.intervals):
         x_i, x_next = guess[i], guess[i + 1]
-        slope = (x_next[:n_dynamic] - x_i[:n_dynamic]) / grid.dt
+        slope = (x_next[:n_dynamic] - x_i[:n_dynamic]) / steps[i]
         for j in range(s):
             c = tableau.c[j]
             seeds.append(slope)
