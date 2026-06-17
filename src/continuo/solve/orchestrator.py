@@ -16,8 +16,10 @@ previous segment (states cannot jump; jumps re-optimise at the surprise).
 Only the realised slice ``[tᵢ, tᵢ₊₁)`` of each segment is kept; the
 reported path covers ``[0, T]``.
 
-Reveal times are snapped to the grid (spacing ``dt = T/N``) so the
-segment grids align and the realised slices splice without
+Each segment's grid forces an exact node at its realised boundary — the
+next reveal time, or the terminal time ``T`` for the last segment — so a
+reveal that falls between equally-spaced nodes is no longer snapped (and
+smeared by up to one ``dt``); the realised slices splice without
 interpolation.
 """
 
@@ -34,7 +36,7 @@ from continuo.codegen.translate import SymbolTable, translate
 from continuo.io.solution import Segment, Solution
 from continuo.ir.model import Model
 from continuo.parser.ast import Expr
-from continuo.solve.disc import SCHEMES, uniform_grid
+from continuo.solve.disc import SCHEMES, Grid, mesh_from_points, uniform_grid
 from continuo.solve.errors import SolveError
 from continuo.solve.linsolve import LinearSolver, select_solver
 from continuo.solve.numeric import constant_table, eval_constant
@@ -102,26 +104,28 @@ def simulate(
     linear = select_solver(solver, stencil=_STENCIL[scheme])
 
     residual = build_residual(model)
-    dt = horizon / intervals
     param_symbols = {name: ca.SX(value) for name, value in theta.items()}
-    schedule = _schedule(model, theta, dt)
-    starts = _segment_starts(schedule, intervals)
+    schedule = _schedule(model, theta)
+    starts = _segment_starts(schedule, horizon)
 
     index = {name: k for k, name in enumerate(model.endogenous)}
     segments: list[Segment] = []
     carried: dict[str, float] | None = None
-    # The stacked Jacobian's pattern is identical across segments (same grid),
-    # so the symbolic analysis is done once and reused; the factorisation is
-    # carried forward to warm-start each segment's first Newton step.
+    # The stacked Jacobian's pattern depends only on (N, n, scheme, order), not
+    # on the node positions, so it is identical across segments even when each
+    # uses a different shock-aligned mesh: analyse once, reuse the factorisation.
     sym: object | None = None
     num: object | None = None
     stats = SolveStats()
 
-    for s, start_index in enumerate(starts):
-        end_index = starts[s + 1] if s + 1 < len(starts) else intervals + 1
-        start_time = start_index * dt
-        exogenous_at = _active_exogenous(schedule, start_index, param_symbols)
-        grid = uniform_grid(horizon, intervals, start=start_time)
+    for s, start_time in enumerate(starts):
+        last = s + 1 == len(starts)
+        # Each segment is solved over a full horizon from its start; the next
+        # reveal (or the terminal time T, for the last segment) is forced to be
+        # an exact node, so a reveal between nodes is no longer snapped/smeared.
+        mark = horizon if last else starts[s + 1]
+        grid, mark_index = _segment_grid(start_time, horizon, intervals, mark)
+        exogenous_at = _active_exogenous(schedule, start_time, param_symbols)
 
         terminal_ss = steady_state(
             model, exogenous=exogenous_at(start_time + horizon), solver=steady_backend
@@ -155,7 +159,9 @@ def simulate(
             stats=stats,
         )
 
-        realised = end_index - start_index
+        # Last segment keeps the mark node (the terminal time); others stop just
+        # before the next reveal and carry that node's state into the next.
+        realised = mark_index + 1 if last else mark_index
         segments.append(
             Segment(
                 start_time=start_time,
@@ -167,8 +173,8 @@ def simulate(
                 iterations=iterations,
             )
         )
-        if end_index <= intervals:  # carry the state into the next segment
-            carried = {name: segment_path[realised, index[name]] for name in model.states}
+        if not last:  # carry the state at the exact reveal node into the next segment
+            carried = {name: segment_path[mark_index, index[name]] for name in model.states}
 
     diagnostics = {
         "scheme": scheme,
@@ -219,38 +225,55 @@ def _resolve_command(
     return float(t), int(n), scheme or command.scheme, chosen_order, chosen_solver
 
 
-def _schedule(
-    model: Model, theta: dict[str, float], dt: float
-) -> dict[str, list[tuple[int, Expr]]]:
-    """For each shock, its beliefs as ``(grid-snapped reveal index, path expr)``, sorted."""
+def _schedule(model: Model, theta: dict[str, float]) -> dict[str, list[tuple[float, Expr]]]:
+    """For each shock, its beliefs as ``(exact reveal time, path expr)``, sorted by time."""
     table = constant_table(theta, {}, model)
-    schedule: dict[str, list[tuple[int, Expr]]] = {}
+    schedule: dict[str, list[tuple[float, Expr]]] = {}
     for shock in model.shocks:
         entries = []
         for path in shock.paths:
             reveal = eval_constant(path.reveal_time, table, what=f"reveal time of {shock.name!r}")
-            entries.append((round(reveal / dt), path.path))
+            entries.append((reveal, path.path))
         schedule[shock.name] = sorted(entries, key=lambda entry: entry[0])
     return schedule
 
 
-def _segment_starts(schedule: dict[str, list[tuple[int, Expr]]], intervals: int) -> list[int]:
-    """Grid indices at which the active belief set changes (always includes 0)."""
-    starts = {0}
+def _segment_starts(schedule: dict[str, list[tuple[float, Expr]]], horizon: float) -> list[float]:
+    """Times at which the active belief set changes (always includes 0)."""
+    starts = {0.0}
     for entries in schedule.values():
-        starts.update(index for index, _ in entries if 0 < index < intervals)
+        starts.update(t for t, _ in entries if 0.0 < t < horizon)
     return sorted(starts)
 
 
+def _segment_grid(start: float, horizon: float, intervals: int, mark: float) -> tuple[Grid, int]:
+    """A mesh on ``[start, start + horizon]`` (``intervals`` intervals) with a node at ``mark``.
+
+    Returns the grid and the index of the ``mark`` node. ``mark`` (the next
+    reveal time, or the terminal time ``T`` for the last segment) thus falls on
+    a node instead of being snapped to the nearest one. When ``mark`` is the far
+    end (or ``intervals < 2``) the mesh is uniform.
+    """
+    far = start + horizon
+    if intervals < 2 or mark >= far:
+        return uniform_grid(horizon, intervals, start=start), intervals
+    m = min(max(int(round(intervals * (mark - start) / horizon)), 1), intervals - 1)
+    left = np.linspace(start, mark, m + 1)
+    right = np.linspace(mark, far, intervals - m + 1)
+    return mesh_from_points(np.concatenate([left, right[1:]])), m
+
+
 def _active_exogenous(
-    schedule: dict[str, list[tuple[int, Expr]]], start_index: int, param_symbols: dict[str, ca.SX]
+    schedule: dict[str, list[tuple[float, Expr]]],
+    start_time: float,
+    param_symbols: dict[str, ca.SX],
 ):
-    """Build ``exogenous_at(t)`` from each shock's belief active at ``start_index``."""
+    """Build ``exogenous_at(t)`` from each shock's belief active at ``start_time``."""
     active: dict[str, Expr] = {}
     for name, entries in schedule.items():
         chosen: Expr | None = None
-        for reveal_index, expr in entries:  # ascending
-            if reveal_index <= start_index:
+        for reveal_time, expr in entries:  # ascending
+            if reveal_time <= start_time:
                 chosen = expr
             else:
                 break

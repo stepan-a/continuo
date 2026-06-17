@@ -189,45 +189,44 @@ def test_state_continuous_across_each_surprise_in_a_chain():
     assert x[second] == pytest.approx(x[second - 1], abs=1e-3)
 
 
-# --- reveal-time snapping --------------------------------------------------
+# --- reveal-time alignment -------------------------------------------------
 
 
-def test_reveal_time_snaps_to_nearest_grid_point():
-    # dt = 0.1; reveal at t=5.07 is closer to index 51 (t=5.1) than to index 50.
+def test_reveal_time_is_an_exact_node():
+    # The reveal time becomes an exact node of the grid — no snapping to the
+    # nearest dt (t=5.07 used to be pulled to t=5.1).
     src = (
         TRACKER + "shocks;\n  var u;\n  path = 0;\n  path at t=5.07 = 1;\nend;\n"
         "simulate(T=20, N=200);"
     )
     sol = simulate(model(src))
     assert len(sol.segments) == 2
-    assert sol.segments[1].start_time == pytest.approx(5.1)
+    assert sol.segments[1].start_time == pytest.approx(5.07)
+    assert np.any(np.isclose(sol.t, 5.07))  # 5.07 is genuinely on the grid
 
 
-def test_reveal_time_at_half_grid_point_uses_banker_rounding():
-    # dt = 1.0; Python's round() rounds half-to-even, so t=2.5 → 2 and t=3.5 → 4.
-    # This test pins that contract: a switch to "round half up" would break it.
-    src_25 = (
-        TRACKER + "shocks;\n  var u;\n  path = 0;\n  path at t=2.5 = 1;\nend;\n"
-        "simulate(T=10, N=10);"
-    )
-    src_35 = (
-        TRACKER + "shocks;\n  var u;\n  path = 0;\n  path at t=3.5 = 1;\nend;\n"
-        "simulate(T=10, N=10);"
-    )
-    assert simulate(model(src_25)).segments[1].start_time == pytest.approx(2.0)
-    assert simulate(model(src_35)).segments[1].start_time == pytest.approx(4.0)
+def test_reveal_times_are_not_rounded():
+    # Reveal times are exact segment starts; the old half-grid rounding is gone.
+    for reveal in (2.5, 3.5):
+        src = (
+            TRACKER + f"shocks;\n  var u;\n  path = 0;\n  path at t={reveal} = 1;\nend;\n"
+            "simulate(T=10, N=10);"
+        )
+        assert simulate(model(src)).segments[1].start_time == pytest.approx(reveal)
 
 
-def test_reveal_snapped_to_grid_index_zero_does_not_create_extra_segment():
-    # dt = 0.1; reveal at t=0.03 rounds to index 0, which _segment_starts filters
-    # out (0 < index < intervals). The single segment runs under the new belief.
+def test_subgrid_reveal_creates_its_own_segment():
+    # A reveal between nodes now opens a (thin) segment at the exact time rather
+    # than being snapped onto t=0.
     src = (
         TRACKER + "shocks;\n  var u;\n  path = 0;\n  path at t=0.03 = 1;\nend;\n"
         "simulate(T=20, N=200);"
     )
     sol = simulate(model(src))
-    assert len(sol.segments) == 1
-    assert sol.segments[0].info_set["u"] == pytest.approx(1.0)
+    assert len(sol.segments) == 2
+    assert sol.segments[0].info_set["u"] == pytest.approx(0.0)
+    assert sol.segments[1].start_time == pytest.approx(0.03)
+    assert sol.segments[1].info_set["u"] == pytest.approx(1.0)
 
 
 # --- scheme selection ------------------------------------------------------
