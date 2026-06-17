@@ -20,6 +20,7 @@ from dataclasses import dataclass
 from continuo.ir.boundary import attach_boundary
 from continuo.ir.classify import classify
 from continuo.ir.commands import attach_commands
+from continuo.ir.constraints import attach_constraints
 from continuo.ir.errors import IRError
 from continuo.ir.model import Model
 from continuo.ir.reduce import reduce_orders
@@ -63,6 +64,7 @@ def build(model_file: ModelFile) -> Model:
         classify(model)
         model = attach_boundary(model, model_file)
         model = attach_steady_state(model, model_file)
+        model = attach_constraints(model, model_file)
         model = attach_shocks(model, model_file)
         model = attach_commands(model, model_file)
     return model

@@ -18,6 +18,21 @@ from continuo.parser.ast import Equation, Expr, VarKind
 
 
 @dataclass(frozen=True)
+class Bound:
+    """A strict domain constraint on an endogenous variable.
+
+    ``lower`` / ``upper`` are bound expressions (literals or expressions
+    over parameters / exogenous variables, evaluated at solve time); a
+    ``None`` side denotes an open (unbounded) direction. At least one side
+    is non-``None``. The constraint is interpreted as the *open* interval
+    ``(lower, upper)``: the solver never reaches a bound.
+    """
+
+    lower: Expr | None
+    upper: Expr | None
+
+
+@dataclass(frozen=True)
 class ShockPath:
     """One (reveal time, expected path) belief for a shock.
 
@@ -94,6 +109,9 @@ class Model:
     # Analytical steady state x_ss = h(theta, e), endogenous name -> RHS
     # expression; empty when no steady_state_model block is given.
     steady_state: dict[str, Expr] = field(default_factory=dict)
+    # Strict domain constraints, endogenous name -> Bound; empty when no
+    # var carries a positive / negative / boundaries qualifier.
+    constraints: dict[str, Bound] = field(default_factory=dict)
     # Exogenous belief paths, one entry per varexo that the shocks block
     # drives; empty when no shocks block is given.
     shocks: tuple[Shock, ...] = ()

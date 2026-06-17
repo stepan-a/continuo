@@ -276,8 +276,19 @@ class SteadyCommand:
 
 @dataclass
 class VarDecl:
+    """A ``var`` declaration with an optional type and domain constraint.
+
+    ``constraint`` is ``None`` when the variable is unconstrained;
+    otherwise it is a normalised ``(lower, upper)`` pair of bound
+    expressions, where a ``None`` side denotes an open (unbounded)
+    direction. ``positive`` normalises to ``(0, None)`` and ``negative``
+    to ``(None, 0)``. The IR layer validates that bound expressions name
+    only parameters / exogenous variables.
+    """
+
     kind: VarKind
     names: list[Identifier]
+    constraint: tuple[Expr | None, Expr | None] | None = None
     pos: SourcePos | None = None
 
 

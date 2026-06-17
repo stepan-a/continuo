@@ -1,7 +1,9 @@
 // continuo grammar.
 //
 // Declarations:
-//   - var declarations, with optional (state) / (jump) qualifier
+//   - var declarations, with an optional qualifier listing a type
+//     (state / jump) and/or a domain constraint (positive / negative /
+//     boundaries=(lo, hi)), e.g. var(state, positive) K;
 //   - varexo declarations
 //   - parameters declarations
 //
@@ -67,7 +69,14 @@ start: statement+
 var_decl: "var" var_qualifier ident_list ";"  -> var_decl_qualified
         | "var" ident_list ";"                 -> var_decl_unqualified
 
-var_qualifier: "(" IDENT ")"
+var_qualifier: "(" qual_item ("," qual_item)* ")"
+
+qual_item: IDENT                                    -> qual_flag
+         | "boundaries" "=" "(" bound "," bound ")"  -> qual_boundaries
+
+bound: "inf"      -> bound_inf
+     | "-" "inf"  -> bound_neg_inf
+     | expr       -> bound_expr
 
 varexo_decl: "varexo" ident_list ";"
 

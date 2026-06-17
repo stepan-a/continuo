@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from lark import Token, Transformer, v_args
 
 from continuo.parser.ast import (
@@ -46,6 +48,25 @@ def _strip_quotes(raw: str) -> str:
     return raw[1:-1]
 
 
+@dataclass
+class _QualFlag:
+    """A bare-word item inside a ``var`` qualifier (state/jump/positive/...)."""
+
+    name: str
+    token: Token
+
+
+@dataclass
+class _QualBounds:
+    """A ``boundaries=(lo, hi)`` item; a ``None`` side denotes an open bound."""
+
+    lower: Expr | None
+    upper: Expr | None
+
+
+_QualItem = _QualFlag | _QualBounds
+
+
 @v_args(inline=True)
 class ASTBuilder(Transformer):
     # --- top level ------------------------------------------------------
@@ -55,22 +76,77 @@ class ASTBuilder(Transformer):
 
     # --- declarations ---------------------------------------------------
 
-    def var_decl_qualified(self, qualifier: VarKind, names: list[Identifier]) -> VarDecl:
-        return VarDecl(kind=qualifier, names=names)
+    def var_decl_qualified(self, qualifier: list[_QualItem], names: list[Identifier]) -> VarDecl:
+        kind, constraint = self._resolve_qualifier(qualifier)
+        return VarDecl(kind=kind, names=names, constraint=constraint)
 
     def var_decl_unqualified(self, names: list[Identifier]) -> VarDecl:
         return VarDecl(kind=VarKind.ALGEBRAIC, names=names)
 
-    def var_qualifier(self, ident_token: Token) -> VarKind:
-        name = ident_token.value
-        if name == "state":
-            return VarKind.STATE
-        if name == "jump":
-            return VarKind.JUMP
-        raise SyntaxError(
-            f"unknown var qualifier {name!r} at line {ident_token.line}, "
-            f"column {ident_token.column}; expected 'state' or 'jump'"
-        )
+    def var_qualifier(self, *items: _QualItem) -> list[_QualItem]:
+        return list(items)
+
+    def qual_flag(self, ident_token: Token) -> _QualFlag:
+        return _QualFlag(name=ident_token.value, token=ident_token)
+
+    def qual_boundaries(self, lower: Expr | None, upper: Expr | None) -> _QualBounds:
+        return _QualBounds(lower=lower, upper=upper)
+
+    def bound_inf(self) -> None:
+        return None
+
+    def bound_neg_inf(self) -> None:
+        return None
+
+    def bound_expr(self, expr: Expr) -> Expr:
+        return expr
+
+    def _resolve_qualifier(
+        self, items: list[_QualItem]
+    ) -> tuple[VarKind, tuple[Expr | None, Expr | None] | None]:
+        """Split a qualifier list into a single type and a single constraint."""
+        kind: VarKind | None = None
+        constraint: tuple[Expr | None, Expr | None] | None = None
+        for item in items:
+            if isinstance(item, _QualFlag):
+                name = item.name
+                if name in ("state", "jump"):
+                    if kind is not None:
+                        raise SyntaxError(
+                            f"conflicting var type {name!r} at line {item.token.line}, "
+                            f"column {item.token.column}; a var has at most one of "
+                            "'state' / 'jump'"
+                        )
+                    kind = VarKind.STATE if name == "state" else VarKind.JUMP
+                elif name in ("positive", "negative"):
+                    constraint = self._set_constraint(
+                        constraint,
+                        (NumberLit(0.0), None) if name == "positive" else (None, NumberLit(0.0)),
+                        item.token,
+                    )
+                else:
+                    raise SyntaxError(
+                        f"unknown var qualifier {name!r} at line {item.token.line}, "
+                        f"column {item.token.column}; expected 'state', 'jump', "
+                        "'positive', 'negative' or 'boundaries=(lo, hi)'"
+                    )
+            else:  # _QualBounds
+                constraint = self._set_constraint(constraint, (item.lower, item.upper), None)
+        return (kind if kind is not None else VarKind.ALGEBRAIC, constraint)
+
+    @staticmethod
+    def _set_constraint(
+        existing: tuple[Expr | None, Expr | None] | None,
+        new: tuple[Expr | None, Expr | None],
+        token: Token | None,
+    ) -> tuple[Expr | None, Expr | None]:
+        if existing is not None:
+            where = f" at line {token.line}, column {token.column}" if token is not None else ""
+            raise SyntaxError(
+                f"more than one domain constraint in a var qualifier{where}; a var "
+                "has at most one of 'positive' / 'negative' / 'boundaries=(lo, hi)'"
+            )
+        return new
 
     def varexo_decl(self, names: list[Identifier]) -> VarexoDecl:
         return VarexoDecl(names=names)
