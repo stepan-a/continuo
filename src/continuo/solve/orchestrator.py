@@ -38,15 +38,14 @@ from continuo.ir.model import Model
 from continuo.parser.ast import Expr
 from continuo.solve.disc import (
     SCHEMES,
-    Grid,
+    aligned_grid,
     equidistribution_ratio,
-    mesh_from_points,
-    uniform_grid,
 )
 from continuo.solve.errors import SolveError
 from continuo.solve.linsolve import LinearSolver, select_solver
 from continuo.solve.numeric import constant_table, eval_constant
 from continuo.solve.pf import SolveStats, initial_conditions, solve_segment
+from continuo.solve.refine import ADAPT_MONITORS, refine_segment
 from continuo.solve.rootfind import SteadySolver, select_steady_solver
 from continuo.solve.steady import (
     directive_solver,
@@ -74,6 +73,8 @@ def simulate(
     intervals: int | None = None,
     scheme: str | None = None,
     order: int | None = None,
+    adapt: float | None = None,
+    monitor: str = "richardson",
     solver: str | LinearSolver | None = None,
     steady_solver: str | SteadySolver | None = None,
     steady_solver_options: dict[str, object] | None = None,
@@ -84,7 +85,11 @@ def simulate(
     command; if both ``horizon`` and ``intervals`` are omitted the command
     must supply them. ``order`` selects the collocation order for the
     multi-stage families (ignored by ``crank_nicolson``; the family default
-    is used when ``None``). ``solver`` selects the linear backend (preset name,
+    is used when ``None``). ``adapt`` turns on adaptive mesh refinement: each
+    segment is refined (curvature-equidistributed) and re-solved until the
+    ``monitor`` error estimate falls below this tolerance — ``monitor`` is
+    ``"richardson"`` (default, a calibrated magnitude) or ``"residual"``.
+    ``solver`` selects the linear backend (preset name,
     :class:`LinearSolver` instance, or the ``"auto"`` default).
     ``steady_solver`` selects the nonlinear algorithm for the internal
     steady-state solves (the terminal anchor and the initial state),
@@ -106,6 +111,11 @@ def simulate(
     steady_backend = select_steady_solver(steady_solver, options=steady_solver_options)
     if scheme not in SCHEMES:
         raise SolveError(f"discretisation scheme {scheme!r} is not implemented yet")
+    if adapt is not None and monitor not in ADAPT_MONITORS:
+        raise SolveError(
+            f"adaptive refinement needs an error-estimating monitor "
+            f"({' or '.join(ADAPT_MONITORS)}), got {monitor!r}"
+        )
     # One backend for the whole run; auto routes by the scheme's coupling stencil.
     linear = select_solver(solver, stencil=_STENCIL[scheme])
 
@@ -130,7 +140,6 @@ def simulate(
         # reveal (or the terminal time T, for the last segment) is forced to be
         # an exact node, so a reveal between nodes is no longer snapped/smeared.
         mark = horizon if last else starts[s + 1]
-        grid, mark_index = _segment_grid(start_time, horizon, intervals, mark)
         exogenous_at = _active_exogenous(schedule, start_time, param_symbols)
 
         terminal_ss = steady_state(
@@ -146,24 +155,48 @@ def simulate(
         else:
             initial_states = carried
         terminal_jumps = {name: terminal_ss[name] for name in model.jumps}
-        guess = np.tile([terminal_ss[name] for name in model.endogenous], (intervals + 1, 1))
+        terminal_row = np.array([terminal_ss[name] for name in model.endogenous])
 
-        segment_path, iterations, sym, num = solve_segment(
-            model,
-            residual,
-            grid,
-            theta=theta,
-            exogenous_at=exogenous_at,
-            initial_states=initial_states,
-            terminal_jumps=terminal_jumps,
-            guess=guess,
-            solver=linear,
-            scheme=scheme,
-            order=order,
-            sym=sym,
-            num=num,
-            stats=stats,
-        )
+        if adapt is None:
+            grid, mark_index = aligned_grid(start_time, horizon, intervals, mark)
+            segment_path, iterations, sym, num = solve_segment(
+                model,
+                residual,
+                grid,
+                theta=theta,
+                exogenous_at=exogenous_at,
+                initial_states=initial_states,
+                terminal_jumps=terminal_jumps,
+                guess=np.tile(terminal_row, (intervals + 1, 1)),
+                solver=linear,
+                scheme=scheme,
+                order=order,
+                sym=sym,
+                num=num,
+                stats=stats,
+            )
+        else:
+            # Adaptive meshes differ per segment, so the cross-segment warm-start
+            # does not apply; each refinement pass re-analyses its own mesh.
+            grid, mark_index, segment_path, iterations = refine_segment(
+                model=model,
+                residual=residual,
+                theta=theta,
+                exogenous_at=exogenous_at,
+                initial_states=initial_states,
+                terminal_jumps=terminal_jumps,
+                terminal_row=terminal_row,
+                scheme=scheme,
+                order=order,
+                solver=linear,
+                stats=stats,
+                start=start_time,
+                horizon=horizon,
+                intervals=intervals,
+                mark=mark,
+                tol=adapt,
+                monitor=monitor,
+            )
 
         # Last segment keeps the mark node (the terminal time); others stop just
         # before the next reveal and carry that node's state into the next.
@@ -254,23 +287,6 @@ def _segment_starts(schedule: dict[str, list[tuple[float, Expr]]], horizon: floa
     for entries in schedule.values():
         starts.update(t for t, _ in entries if 0.0 < t < horizon)
     return sorted(starts)
-
-
-def _segment_grid(start: float, horizon: float, intervals: int, mark: float) -> tuple[Grid, int]:
-    """A mesh on ``[start, start + horizon]`` (``intervals`` intervals) with a node at ``mark``.
-
-    Returns the grid and the index of the ``mark`` node. ``mark`` (the next
-    reveal time, or the terminal time ``T`` for the last segment) thus falls on
-    a node instead of being snapped to the nearest one. When ``mark`` is the far
-    end (or ``intervals < 2``) the mesh is uniform.
-    """
-    far = start + horizon
-    if intervals < 2 or mark >= far:
-        return uniform_grid(horizon, intervals, start=start), intervals
-    m = min(max(int(round(intervals * (mark - start) / horizon)), 1), intervals - 1)
-    left = np.linspace(start, mark, m + 1)
-    right = np.linspace(mark, far, intervals - m + 1)
-    return mesh_from_points(np.concatenate([left, right[1:]])), m
 
 
 def _active_exogenous(

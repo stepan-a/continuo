@@ -17,7 +17,7 @@ import numpy as np
 
 from continuo.solve.errors import SolveError
 
-__all__ = ["Grid", "uniform_grid", "mesh_from_points"]
+__all__ = ["Grid", "uniform_grid", "mesh_from_points", "aligned_grid"]
 
 
 @dataclass(eq=False)
@@ -77,3 +77,20 @@ def mesh_from_points(points: np.ndarray) -> Grid:
     if np.any(np.diff(pts) <= 0):
         raise SolveError("grid points must be strictly increasing")
     return Grid(points=pts)
+
+
+def aligned_grid(start: float, horizon: float, intervals: int, mark: float) -> tuple[Grid, int]:
+    """A mesh on ``[start, start + horizon]`` (``intervals`` intervals) with a node at ``mark``.
+
+    Returns the grid and the index of the ``mark`` node — the next reveal time
+    of a segment, or the terminal time ``T`` for the last one — so it falls on
+    a node instead of being snapped to the nearest one. When ``mark`` is the far
+    end (or ``intervals < 2``) the mesh is uniform.
+    """
+    far = start + horizon
+    if intervals < 2 or mark >= far:
+        return uniform_grid(horizon, intervals, start=start), intervals
+    m = min(max(int(round(intervals * (mark - start) / horizon)), 1), intervals - 1)
+    left = np.linspace(start, mark, m + 1)
+    right = np.linspace(mark, far, intervals - m + 1)
+    return mesh_from_points(np.concatenate([left, right[1:]])), m
