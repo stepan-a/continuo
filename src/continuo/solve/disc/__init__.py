@@ -16,6 +16,14 @@ from __future__ import annotations
 from continuo.solve.disc.collocation import collocation_residual
 from continuo.solve.disc.crank_nicolson import crank_nicolson_residual
 from continuo.solve.disc.grid import Grid, mesh_from_points, uniform_grid
+from continuo.solve.disc.monitor import (
+    MONITORS,
+    GridError,
+    Monitor,
+    MonitorInput,
+    equidistribution_ratio,
+    select_monitor,
+)
 from continuo.solve.disc.tableaux import (
     SCHEME_ORDERS,
     ButcherTableau,
@@ -44,4 +52,10 @@ __all__ = [
     "default_order",
     "SCHEME_ORDERS",
     "SCHEMES",
+    "GridError",
+    "MonitorInput",
+    "Monitor",
+    "MONITORS",
+    "select_monitor",
+    "equidistribution_ratio",
 ]

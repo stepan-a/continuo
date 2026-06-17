@@ -47,6 +47,7 @@ from continuo.solve.disc import (
     Grid,
     collocation_residual,
     crank_nicolson_residual,
+    equidistribution_ratio,
     tableau_for,
     uniform_grid,
 )
@@ -167,6 +168,7 @@ def solve_pf(
             "segments": 1,
             "newton_iterations": iterations,
             "solver": linear.name,
+            "equidistribution_ratio": equidistribution_ratio(grid.points, path),
             **stats.as_dict(),
         },
     )

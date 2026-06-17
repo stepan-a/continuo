@@ -36,7 +36,13 @@ from continuo.codegen.translate import SymbolTable, translate
 from continuo.io.solution import Segment, Solution
 from continuo.ir.model import Model
 from continuo.parser.ast import Expr
-from continuo.solve.disc import SCHEMES, Grid, mesh_from_points, uniform_grid
+from continuo.solve.disc import (
+    SCHEMES,
+    Grid,
+    equidistribution_ratio,
+    mesh_from_points,
+    uniform_grid,
+)
 from continuo.solve.errors import SolveError
 from continuo.solve.linsolve import LinearSolver, select_solver
 from continuo.solve.numeric import constant_table, eval_constant
@@ -176,13 +182,17 @@ def simulate(
         if not last:  # carry the state at the exact reveal node into the next segment
             carried = {name: segment_path[mark_index, index[name]] for name in model.states}
 
+    solution = Solution(tuple(segments), model.endogenous, {})
     diagnostics = {
         "scheme": scheme,
         "segments": len(segments),
         "newton_iterations": sum(segment.iterations for segment in segments),
         "solver": linear.name,
+        # Cheap grid-adequacy hint: ~1 balanced, >>1 resolution misallocated.
+        "equidistribution_ratio": equidistribution_ratio(solution.t, solution.path),
         **stats.as_dict(),
     }
+    solution.diagnostics.update(diagnostics)
     logger.info(
         "simulated %d segment(s), %d Newton iteration(s) total (%s); "
         "%s: %d factor(s), %d refactor(s)%s",
@@ -194,7 +204,7 @@ def simulate(
         stats.refactorizations,
         f", {stats.refactor_fallbacks} fallback(s)" if stats.refactor_fallbacks else "",
     )
-    return Solution(tuple(segments), model.endogenous, diagnostics)
+    return solution
 
 
 # ---------------------------------------------------------------------------
