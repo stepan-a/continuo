@@ -24,9 +24,16 @@ Arguments (all keyword):
    The number of grid intervals. Positive.
 
 ``scheme`` (optional, string, default ``"crank_nicolson"``)
-   The discretisation scheme. Currently only ``crank_nicolson``
-   (implicit midpoint, second-order, A-stable) is implemented; other
-   names parse but raise a ``SolveError`` at solve time.
+   The discretisation scheme: ``crank_nicolson`` (implicit midpoint,
+   second-order, A-stable) or a collocation family — ``gauss``
+   (Gauss–Legendre), ``radau`` (Radau IIA, L-stable) or ``lobatto_iiia``.
+   See :doc:`/schemes`.
+
+``order`` (optional, ``int``)
+   The collocation order for a multi-stage family — ``gauss`` ∈ {2, 4, 6},
+   ``radau`` ∈ {1, 3, 5}, ``lobatto_iiia`` ∈ {2, 4, 6}; the family default
+   is used when omitted. ``crank_nicolson`` is fixed second-order and takes
+   no ``order``. Invalid combinations are rejected when the file is read.
 
 ``solver`` (optional, preset name, default ``auto``)
    The linear backend for the Newton solve — ``auto``, ``superlu``,

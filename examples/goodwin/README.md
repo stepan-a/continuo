@@ -129,6 +129,34 @@ print(sol["v"].min(), sol["v"].max())   # employment swings over the cycle
 fp = model.steady_state()               # the centre of the orbit (a guess seed)
 ```
 
+## Discretisation accuracy
+
+Because the orbit is smooth and closed, it is a clean test of the
+discretisation schemes (see the [manual](../../doc/manual/schemes.rst)). The
+companion runner solves the moderate scenario at a range of grid resolutions
+`N` with Crank–Nicolson (order 2), Gauss–Legendre order 4 and Radau IIA order
+5, measured against a fine Gauss order-6 reference, and writes a log–log error
+plot (`schemes.png`):
+
+```console
+$ python examples/goodwin/run_schemes.py
+```
+
+The error falls like `h^p` with the scheme order `p`, so the higher-order
+schemes reach at `N = 150` an accuracy Crank–Nicolson does not match even at
+`N = 1200`:
+
+| N    | crank_nicolson (2) | gauss (4) | radau (5) |
+|------|--------------------|-----------|-----------|
+| 150  | 2.7e-02            | 2.3e-05   | 5.3e-07   |
+| 300  | 6.9e-03            | 1.4e-06   | 1.6e-08   |
+| 600  | 1.7e-03            | 9.0e-08   | 5.2e-10   |
+| 1200 | 4.3e-04            | 5.6e-09   | 1.6e-11   |
+
+```python
+sol = model.simul(scheme="radau", order=5)   # or scheme="gauss", scheme="lobatto_iiia"
+```
+
 ## References
 
 - Goodwin, R.M. (1967), "A Growth Cycle," in C.H. Feinstein (ed.), *Socialism,

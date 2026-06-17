@@ -6,8 +6,9 @@ dynamic models in the spirit of Dynare. A ``.mod`` file declares the
 endogenous and exogenous variables, the model equations (as differential
 equations in continuous time, written with ``diff(x)``), the steady state
 and the exogenous shock paths; the toolbox parses it, discretises the
-two-point boundary-value problem with a Crank–Nicolson collocation, and
-solves the stacked nonlinear system with Newton's method. Anticipated
+two-point boundary-value problem by collocation (Crank–Nicolson by default,
+or a higher-order Gauss / Radau IIA / Lobatto IIIA family), and solves the
+stacked nonlinear system with Newton's method. Anticipated
 changes, surprises (multi-segment beliefs) and occasionally-binding
 constraints are all supported through the same machinery.
 
@@ -21,9 +22,11 @@ The toolbox has three faces:
 This manual is the reference for all three. The :doc:`quickstart` shows
 the smallest end-to-end use; the :doc:`language/index` documents every
 block and built-in of the surface language; :doc:`api` is the Python
-reference (generated from docstrings); :doc:`solvers` documents the
-pluggable linear backends and how to choose one; :doc:`steady_solvers`
-does the same for the nonlinear steady-state algorithms; :doc:`examples`
+reference (generated from docstrings); :doc:`schemes` documents the
+discretisation schemes (Crank–Nicolson and the higher-order collocation
+families); :doc:`solvers` documents the pluggable linear backends and how to
+choose one; :doc:`steady_solvers` does the same for the nonlinear
+steady-state algorithms; :doc:`examples`
 is the index of the worked-out example models that ship with the source
 tree.
 
@@ -40,6 +43,7 @@ tree.
 
    language/index
    api
+   schemes
    solvers
    steady_solvers
    cli

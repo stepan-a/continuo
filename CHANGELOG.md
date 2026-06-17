@@ -20,6 +20,13 @@ follows [Semantic Versioning](https://semver.org).
 - The `steady` directive accepts a `nodomain` flag
   (`steady(nodomain);`, combinable with `t=` / `solver=` / …) that disables
   the domain change of variable.
+- `simulate` accepts higher-order discretisation schemes — `gauss`
+  (Gauss–Legendre), `radau` (Radau IIA), `lobatto_iiia` — alongside the
+  default `crank_nicolson`, with an `order=` argument selecting the
+  collocation order (e.g. `simulate(T=120, N=300, scheme=radau, order=5);`).
+  The order is validated per family at read time. The unimplemented `sdirk`
+  name is removed from the grammar. `Model.simul` / the CLI gain matching
+  `scheme` / `order` (`--scheme`, `--order`) overrides.
 
 ### Solver
 
@@ -38,6 +45,16 @@ follows [Semantic Versioning](https://semver.org).
   argument; `Model.steady_state(nodomain=None)` defers to the
   `steady(nodomain)` directive, an explicit bool overriding it (the same
   precedence as `solver`).
+- The perfect-foresight transition can be discretised by higher-order
+  collocation. A Butcher-tableau engine (`solve/disc/collocation.py`,
+  `tableaux.py`) builds the Gauss–Legendre, Radau IIA and Lobatto IIIA
+  families; each interval carries internal stage unknowns in the stacked
+  vector, composed with the residual and differentiated by CasADi AD, so the
+  exact Jacobian and the one-step (block-triangular) coupling are preserved.
+  Crank–Nicolson stays the default and its assembly is unchanged. The error
+  falls at the scheme's global order — on a smooth problem the higher-order
+  families reach a target accuracy on a far coarser grid (see the Goodwin
+  example).
 
 ## [0.0.3] — 2026-06-16
 
