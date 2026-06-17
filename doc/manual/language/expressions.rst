@@ -93,6 +93,11 @@ The conditional ``if(condition, then, else)`` (with the 1-argument sugar
    use a smooth approximation like ``0.5*(z + sqrt(z*z + eps))`` in
    place of ``max(0, z)``.
 
+   These folds live **in the equations** and may bind — they are distinct
+   from the **domain constraints** declared on a ``var`` qualifier
+   (:doc:`constraints`), which keep a variable *strictly* inside an open
+   range and are never active at the solution.
+
 Context-specific extras
 -----------------------
 

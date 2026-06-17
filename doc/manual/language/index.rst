@@ -24,6 +24,7 @@ This part of the manual documents each construct in turn:
    :maxdepth: 1
 
    declarations
+   constraints
    model
    steady_state
    boundary

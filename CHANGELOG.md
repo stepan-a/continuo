@@ -4,6 +4,41 @@ All notable changes to **continuo** are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versioning
 follows [Semantic Versioning](https://semver.org).
 
+## [Unreleased]
+
+### Language
+
+- A `var` qualifier may now carry a **domain constraint** alongside the
+  optional `state` / `jump` type: `positive` (`> 0`), `negative` (`< 0`),
+  or `boundaries=(lo, hi)` for an explicit open interval (`inf` / `-inf`
+  for an open side). A bound may be a literal or an expression over
+  parameters / exogenous variables — never an endogenous variable — and is
+  evaluated at solve time. Constraints are recorded on `Model.constraints`
+  as `Bound` objects. Illegal bounds (naming an endogenous or undeclared
+  name, or `lower ≥ upper` for two literals) are rejected when the model is
+  read, on every path — including under an analytical `steady_state_model`.
+- The `steady` directive accepts a `nodomain` flag
+  (`steady(nodomain);`, combinable with `t=` / `solver=` / …) that disables
+  the domain change of variable.
+
+### Solver
+
+- The numerical steady state of a constrained model is solved by a smooth,
+  invertible **change of variable** `x = T(y)`: the root-find runs in an
+  unconstrained `y` while `x` stays strictly inside its open domain, so the
+  residual never sees a `NaN` from `K^alpha` / `log(K)` outside the domain.
+  The transform composes with the existing residual and is differentiated
+  by CasADi AD (the exact Jacobian is preserved); the choice of nonlinear
+  backend is unaffected. A solution that *saturates* a bound (an MCP) is out
+  of scope.
+- An `initial_guess` for a constrained variable must be strictly interior to
+  its domain (validated through `T⁻¹`); a guess on or outside a bound raises
+  a `SolveError`.
+- `Model.steady_state` / `continuo.solve.steady_state` gain a `nodomain`
+  argument; `Model.steady_state(nodomain=None)` defers to the
+  `steady(nodomain)` directive, an explicit bool overriding it (the same
+  precedence as `solver`).
+
 ## [0.0.3] — 2026-06-16
 
 ### Solver

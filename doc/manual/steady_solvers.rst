@@ -247,6 +247,26 @@ A starting iterate still comes from the ``initial_guess`` block (or a
 caller-supplied ``guess=``), falling back to ``1.0`` per variable; the
 solver choice only changes how the iteration proceeds from there.
 
+Domain constraints
+------------------
+
+When a variable is declared with a domain constraint
+(``var(positive) K;`` and friends, see :doc:`language/constraints`), the
+numerical path solves a **reparametrised** system: it roots
+:math:`F(T(y)) = 0` in an unconstrained :math:`y`, where :math:`x = T(y)`
+maps onto the open declared domain, so the residual is never evaluated at an
+out-of-domain :math:`x`. This removes the ``NaN`` failure mode that the
+Armijo line search of ``newton`` (and a good ``initial_guess`` for
+``kinsol``) could only soften. The reparametrisation is transparent to the
+solver choice — ``auto`` and every preset work unchanged in :math:`y`-space,
+since CasADi differentiates the composition and hands each backend the exact
+:math:`\partial F/\partial y`.
+
+The ``nodomain`` flag on the ``steady`` directive (or
+``Model.steady_state(nodomain=True)``) disables the change of variable,
+solving in raw :math:`x` even when constraints are declared — for debugging
+or to fall back when a solution saturates a bound.
+
 Diagnostics
 -----------
 

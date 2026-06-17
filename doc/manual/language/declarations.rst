@@ -35,6 +35,11 @@ The IR classifies a variable's role from the equations as well as the
 declaration, and rejects inconsistencies (e.g. a ``var(state)`` with no
 ``diff(.)`` on a left-hand side, or two ``diff(x)`` definitions).
 
+The qualifier may also carry a **domain constraint** (``positive`` /
+``negative`` / ``boundaries=(lo, hi)``) that keeps the variable strictly
+inside a known range when the steady state is solved numerically — see
+:doc:`constraints`.
+
 Exogenous processes: ``varexo``
 -------------------------------
 
