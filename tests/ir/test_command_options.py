@@ -74,6 +74,40 @@ def test_simulate_order_must_be_positive_integer():
         ir("simulate(T=200, N=400, scheme=radau, order=2.5);")
 
 
+# --- adaptive refinement (adapt / monitor) --------------------------------
+
+
+def test_simulate_adapt_and_monitor_default_to_none():
+    sim = ir("simulate(T=200, N=400);").simulations[0]
+    assert sim.adapt is None
+    assert sim.monitor is None
+
+
+def test_simulate_adapt_parsed():
+    sim = ir("simulate(T=200, N=400, adapt=1e-4);").simulations[0]
+    assert sim.adapt.value == pytest.approx(1e-4)
+
+
+def test_simulate_monitor_parsed():
+    sim = ir("simulate(T=200, N=400, adapt=1e-4, monitor=residual);").simulations[0]
+    assert sim.monitor == "residual"
+
+
+def test_simulate_adapt_must_be_positive():
+    with pytest.raises(IRError, match="adapt tolerance must be positive"):
+        ir("simulate(T=200, N=400, adapt=-1e-4);")
+
+
+def test_simulate_monitor_requires_adapt():
+    with pytest.raises(IRError, match="monitor requires adapt"):
+        ir("simulate(T=200, N=400, monitor=richardson);")
+
+
+def test_simulate_rejects_unknown_monitor():
+    with pytest.raises(IRError, match="unknown error monitor 'curvature'"):
+        ir("simulate(T=200, N=400, adapt=1e-4, monitor=curvature);")
+
+
 def test_simulate_solver_defaults_to_none():
     assert ir("simulate(T=200, N=400);").simulations[0].solver is None
 

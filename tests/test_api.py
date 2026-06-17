@@ -82,6 +82,17 @@ def test_simul_reads_the_command_and_overrides():
     assert model.simul(horizon=2.0, intervals=4).t[-1] == pytest.approx(2.0)
 
 
+def test_simul_adapt_from_directive_and_override():
+    src = SADDLE.replace(
+        "simulate(T=5, N=20);", "simulate(T=5, N=20, adapt=1e-4, monitor=residual);"
+    )
+    # The directive turns adaptivity on (more nodes than the uniform N=20 → 21).
+    assert continuo.parse_string(src).simul().t.size > 21
+    # An explicit monitor override is accepted end to end.
+    sol = continuo.parse_string(src).simul(adapt=1e-3, monitor="richardson")
+    assert sol["x"][0] == pytest.approx(1.0)
+
+
 def test_simul_scheme_and_order_override():
     model = continuo.parse_string(SADDLE)
     sol = model.simul(scheme="radau", order=5)

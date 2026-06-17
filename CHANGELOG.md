@@ -27,6 +27,11 @@ follows [Semantic Versioning](https://semver.org).
   The order is validated per family at read time. The unimplemented `sdirk`
   name is removed from the grammar. `Model.simul` / the CLI gain matching
   `scheme` / `order` (`--scheme`, `--order`) overrides.
+- `simulate` gains adaptive mesh refinement: `adapt=<tol>` refines the grid to
+  an error tolerance (`N` becomes the starting resolution) and `monitor=`
+  chooses the estimator (`richardson` or `residual`); both are exposed on
+  `Model.simul` and the CLI (`--adapt`, `--monitor`). Shock reveal times are
+  now placed on exact grid nodes rather than snapped to the nearest one.
 
 ### Solver
 
@@ -55,6 +60,15 @@ follows [Semantic Versioning](https://semver.org).
   falls at the scheme's global order — on a smooth problem the higher-order
   families reach a target accuracy on a far coarser grid (see the Goodwin
   example).
+- The time grid can be non-uniform and adaptively refined. `Grid` is defined
+  by its node positions (per-interval steps derived), shock reveal times are
+  forced onto exact nodes, and `adapt` runs a per-segment refinement loop
+  (`solve/refine.py`): equidistribute the curvature, bisect the worst
+  intervals, re-solve until an error monitor (`solve/disc/monitor.py` —
+  `curvature` / `richardson` / `residual`) falls below tolerance, with the
+  reveal/terminal nodes pinned and a node cap. Every solve reports
+  `diagnostics["equidistribution_ratio"]` as a grid-adequacy hint. See the
+  RBC example.
 
 ## [0.0.3] — 2026-06-16
 

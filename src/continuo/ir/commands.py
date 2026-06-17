@@ -47,6 +47,10 @@ _SCHEME_ORDERS = {
     "lobatto_iiia": {2, 4, 6},
 }
 
+# Error monitors that can drive adaptive refinement (mirror solve.refine
+# ADAPT_MONITORS); curvature is placement-only and cannot set a tolerance.
+_MONITORS = {"richardson", "residual"}
+
 # Linear-solver presets the simulate directive recognises (mirrors
 # solve.SOLVERS plus "auto"); availability is checked at solve time.
 _SOLVERS = {"auto", "superlu", "klu", "klu-nobtf", "umfpack", "pardiso"}
@@ -95,7 +99,11 @@ def attach_commands(model: Model, model_file: ModelFile) -> Model:
 def _simulate(cmd: SimulateCommand) -> Simulation:
     if cmd.args:
         raise IRError("simulate takes keyword arguments only (T=…, N=…)", cmd.pos)
-    options = _collect(cmd.kwargs, allowed=("T", "N", "scheme", "solver", "order"), what="simulate")
+    options = _collect(
+        cmd.kwargs,
+        allowed=("T", "N", "scheme", "solver", "order", "adapt", "monitor"),
+        what="simulate",
+    )
     if "T" not in options:
         raise IRError("simulate requires the horizon T", cmd.pos)
     if "N" not in options:
@@ -103,12 +111,19 @@ def _simulate(cmd: SimulateCommand) -> Simulation:
     _check_positive("T", options["T"], integer=False)
     _check_positive("N", options["N"], integer=True)
     scheme = _scheme(options.get("scheme"))
+    if "monitor" in options and "adapt" not in options:
+        raise IRError(
+            "simulate monitor requires adapt (e.g. adapt=1e-4)",
+            getattr(options["monitor"], "pos", None),
+        )
     return Simulation(
         options["T"],
         options["N"],
         scheme,
         _solver(options.get("solver")),
         _order(scheme, options.get("order")),
+        _adapt(options.get("adapt")),
+        _monitor(options.get("monitor")),
     )
 
 
@@ -150,6 +165,33 @@ def _order(scheme: str, value: Expr | None) -> int | None:
             getattr(value, "pos", None),
         )
     return int(n)
+
+
+def _adapt(value: Expr | None) -> Expr | None:
+    """The adaptive-refinement tolerance expression; ``None`` when unspecified."""
+    if value is None:
+        return None
+    literal = _literal(value)
+    if literal is not None and literal <= 0:
+        raise IRError("simulate adapt tolerance must be positive", getattr(value, "pos", None))
+    return value
+
+
+def _monitor(value: Expr | None) -> str | None:
+    """The error monitor named as a bare identifier; ``None`` → the solver default."""
+    if value is None:
+        return None
+    if not isinstance(value, Identifier):
+        raise IRError(
+            "simulate monitor must be a monitor name (e.g. monitor=richardson)",
+            getattr(value, "pos", None),
+        )
+    if value.name not in _MONITORS:
+        raise IRError(
+            f"unknown error monitor {value.name!r}; expected one of {', '.join(sorted(_MONITORS))}",
+            value.pos,
+        )
+    return value.name
 
 
 def _solver(value: Expr | None) -> str | None:

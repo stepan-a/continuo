@@ -61,7 +61,9 @@ class Simulation:
     when unspecified, leaving the choice to ``auto`` / the caller). ``order``
     is the collocation order for the multi-stage schemes (``None`` when
     unspecified, taking the family default; always ``None`` for
-    ``crank_nicolson``).
+    ``crank_nicolson``). ``adapt`` is the adaptive-refinement tolerance
+    expression (``None`` for a fixed uniform grid) and ``monitor`` the error
+    monitor that drives it (``None`` → the solver default).
     """
 
     horizon: Expr
@@ -69,6 +71,8 @@ class Simulation:
     scheme: str
     solver: str | None = None
     order: int | None = None
+    adapt: Expr | None = None
+    monitor: str | None = None
 
 
 @dataclass(frozen=True)

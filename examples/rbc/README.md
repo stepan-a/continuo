@@ -138,3 +138,23 @@ argument evaluates that steady state at the given exogenous values (here `e=0`)
 instead of the active ones (`e=0.05`). The same override is available on the
 per-variable callable, `steady_state(K, e={e: 0})`, for use inside a plain
 `initval` block.
+
+## Adaptive grids
+
+The baseline response adjusts fast early (the saddle path) and slowly in the
+long mean-reverting tail — so a uniform grid over-resolves the tail and
+under-resolves the start (the `equidistribution_ratio` diagnostic is ~24).
+Turning on adaptive refinement (see the [manual](../../doc/manual/grids.rst))
+concentrates nodes where the path bends and balances the error (ratio ~1.5):
+
+```console
+$ python examples/rbc/run_adapt.py
+```
+
+```python
+sol = model.simul(adapt=1e-6)            # refine until the error estimate < 1e-6
+# or in the .mod file:  simulate(T=50, N=250, adapt=1e-6);
+```
+
+The runner writes `adapt.png`: the capital path with the adaptive nodes, and
+the step size against time (fine near `t=0`, coarse in the tail).

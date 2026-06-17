@@ -35,6 +35,14 @@ Arguments (all keyword):
    is used when omitted. ``crank_nicolson`` is fixed second-order and takes
    no ``order``. Invalid combinations are rejected when the file is read.
 
+``adapt`` (optional, ``float``)
+   Turn on adaptive mesh refinement to this error tolerance; ``N`` becomes the
+   starting resolution. Omitted ⇒ a fixed uniform grid. See :doc:`/grids`.
+
+``monitor`` (optional, preset name, requires ``adapt``)
+   The error monitor driving ``adapt`` — ``richardson`` (default) or
+   ``residual``. See :doc:`/grids`.
+
 ``solver`` (optional, preset name, default ``auto``)
    The linear backend for the Newton solve — ``auto``, ``superlu``,
    ``klu``, ``umfpack`` or ``pardiso``. Write the dashed preset as a

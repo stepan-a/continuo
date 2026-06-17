@@ -24,9 +24,10 @@ the smallest end-to-end use; the :doc:`language/index` documents every
 block and built-in of the surface language; :doc:`api` is the Python
 reference (generated from docstrings); :doc:`schemes` documents the
 discretisation schemes (Crank–Nicolson and the higher-order collocation
-families); :doc:`solvers` documents the pluggable linear backends and how to
-choose one; :doc:`steady_solvers` does the same for the nonlinear
-steady-state algorithms; :doc:`examples`
+families); :doc:`grids` documents the time grid and adaptive refinement;
+:doc:`solvers` documents the pluggable linear backends and how to choose one;
+:doc:`steady_solvers` does the same for the nonlinear steady-state
+algorithms; :doc:`examples`
 is the index of the worked-out example models that ship with the source
 tree.
 
@@ -44,6 +45,7 @@ tree.
    language/index
    api
    schemes
+   grids
    solvers
    steady_solvers
    cli

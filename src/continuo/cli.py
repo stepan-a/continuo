@@ -38,6 +38,8 @@ def main(argv: list[str] | None = None) -> int:
             intervals=args.intervals,
             scheme=args.scheme,
             order=args.order,
+            adapt=args.adapt,
+            monitor=args.monitor,
             solver=args.solver,
             steady_solver=args.steady_solver,
             steady_solver_options=_parse_options(args.steady_solver_option),
@@ -73,6 +75,16 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         "--order",
         type=int,
         help="collocation order for a multi-stage scheme (e.g. --scheme radau --order 5)",
+    )
+    parser.add_argument(
+        "--adapt",
+        type=float,
+        metavar="TOL",
+        help="adaptively refine the grid to this error tolerance (e.g. --adapt 1e-4)",
+    )
+    parser.add_argument(
+        "--monitor",
+        help="error monitor driving --adapt (richardson, residual)",
     )
     parser.add_argument(
         "--solver",

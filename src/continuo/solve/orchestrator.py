@@ -57,6 +57,7 @@ from continuo.solve.steady import (
 __all__ = ["simulate"]
 
 _DEFAULT_SCHEME = "crank_nicolson"
+_DEFAULT_MONITOR = "richardson"
 
 # Coupling stencil each scheme generates, which guides ``solver="auto"``:
 # CN and the collocation families are all one-step (each interval couples only
@@ -74,7 +75,7 @@ def simulate(
     scheme: str | None = None,
     order: int | None = None,
     adapt: float | None = None,
-    monitor: str = "richardson",
+    monitor: str | None = None,
     solver: str | LinearSolver | None = None,
     steady_solver: str | SteadySolver | None = None,
     steady_solver_options: dict[str, object] | None = None,
@@ -99,8 +100,8 @@ def simulate(
     ``options={…}``.
     """
     theta = evaluate_parameters(model)
-    horizon, intervals, scheme, order, solver = _resolve_command(
-        model, theta, horizon, intervals, scheme, order, solver
+    horizon, intervals, scheme, order, adapt, monitor, solver = _resolve_command(
+        model, theta, horizon, intervals, scheme, order, adapt, monitor, solver
     )
     if steady_solver is None:
         steady_solver = directive_solver(model)
@@ -252,11 +253,21 @@ def _resolve_command(
     intervals: int | None,
     scheme: str | None,
     order: int | None,
+    adapt: float | None,
+    monitor: str | None,
     solver: str | LinearSolver | None,
-) -> tuple[float, int, str, int | None, str | LinearSolver | None]:
-    # Precedence for scheme/order/solver: explicit argument > simulate directive > default.
+) -> tuple[float, int, str, int | None, float | None, str, str | LinearSolver | None]:
+    # Precedence for scheme/order/adapt/monitor/solver: argument > directive > default.
     if horizon is not None and intervals is not None:
-        return float(horizon), int(intervals), scheme or _DEFAULT_SCHEME, order, solver
+        return (
+            float(horizon),
+            int(intervals),
+            scheme or _DEFAULT_SCHEME,
+            order,
+            adapt,
+            monitor or _DEFAULT_MONITOR,
+            solver,
+        )
     if not model.simulations:
         raise SolveError("no simulate command in the model; pass horizon and intervals")
     command = model.simulations[0]
@@ -265,7 +276,22 @@ def _resolve_command(
     n = eval_constant(command.grid, table, what="simulate grid N")
     chosen_solver = solver if solver is not None else command.solver
     chosen_order = order if order is not None else command.order
-    return float(t), int(n), scheme or command.scheme, chosen_order, chosen_solver
+    if adapt is not None:
+        chosen_adapt: float | None = adapt
+    elif command.adapt is not None:
+        chosen_adapt = eval_constant(command.adapt, table, what="simulate adapt tolerance")
+    else:
+        chosen_adapt = None
+    chosen_monitor = monitor or command.monitor or _DEFAULT_MONITOR
+    return (
+        float(t),
+        int(n),
+        scheme or command.scheme,
+        chosen_order,
+        chosen_adapt,
+        chosen_monitor,
+        chosen_solver,
+    )
 
 
 def _schedule(model: Model, theta: dict[str, float]) -> dict[str, list[tuple[float, Expr]]]:
