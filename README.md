@@ -6,7 +6,7 @@
 |------------------------------------------- | -------: | -------: | ------: | --------: |
 | src/continuo/\_\_init\_\_.py               |       11 |        0 |    100% |           |
 | src/continuo/api.py                        |       47 |        0 |    100% |           |
-| src/continuo/cli.py                        |       68 |        1 |     99% |       131 |
+| src/continuo/cli.py                        |       70 |        1 |     99% |       143 |
 | src/continuo/codegen/\_\_init\_\_.py       |        6 |        0 |    100% |           |
 | src/continuo/codegen/errors.py             |       12 |        0 |    100% |           |
 | src/continuo/codegen/native.py             |       45 |        1 |     98% |        95 |
@@ -18,10 +18,10 @@
 | src/continuo/ir/boundary.py                |      105 |       11 |     90% |96, 103, 133, 141, 143, 146-149, 165, 192 |
 | src/continuo/ir/build.py                   |       91 |        0 |    100% |           |
 | src/continuo/ir/classify.py                |       81 |        5 |     94% |85, 87-88, 95, 97 |
-| src/continuo/ir/commands.py                |      140 |        4 |     97% |119, 164, 242, 279 |
+| src/continuo/ir/commands.py                |      158 |        5 |     97% |134, 185, 206, 284, 321 |
 | src/continuo/ir/constraints.py             |       57 |        9 |     84% | 48, 82-89 |
 | src/continuo/ir/errors.py                  |       12 |        0 |    100% |           |
-| src/continuo/ir/model.py                   |       60 |        0 |    100% |           |
+| src/continuo/ir/model.py                   |       62 |        0 |    100% |           |
 | src/continuo/ir/reduce.py                  |       85 |        3 |     96% |94, 101, 117 |
 | src/continuo/ir/shocks.py                  |       66 |        1 |     98% |       108 |
 | src/continuo/ir/steady\_state.py           |       40 |        0 |    100% |           |
@@ -36,20 +36,22 @@
 | src/continuo/parser/transform.py           |      163 |        0 |    100% |           |
 | src/continuo/solve/\_\_init\_\_.py         |        9 |        0 |    100% |           |
 | src/continuo/solve/\_klu.py                |      126 |       12 |     90% |82-85, 116-117, 171, 177, 187, 197, 209, 222 |
-| src/continuo/solve/disc/\_\_init\_\_.py    |        7 |        0 |    100% |           |
+| src/continuo/solve/disc/\_\_init\_\_.py    |        8 |        0 |    100% |           |
 | src/continuo/solve/disc/collocation.py     |       39 |        0 |    100% |           |
 | src/continuo/solve/disc/crank\_nicolson.py |       20 |        0 |    100% |           |
-| src/continuo/solve/disc/grid.py            |       21 |        0 |    100% |           |
+| src/continuo/solve/disc/grid.py            |       44 |        0 |    100% |           |
+| src/continuo/solve/disc/monitor.py         |       92 |        2 |     98% |  171, 188 |
 | src/continuo/solve/disc/tableaux.py        |       49 |        1 |     98% |       124 |
 | src/continuo/solve/errors.py               |        3 |        0 |    100% |           |
 | src/continuo/solve/linsolve.py             |      201 |       45 |     78% |226-227, 236, 245-248, 264-268, 271-278, 281, 284-286, 289, 292, 301-302, 319-321, 324-326, 329, 332, 335, 340-347, 352-359, 404, 406 |
 | src/continuo/solve/numeric.py              |       23 |        4 |     83% |     38-41 |
-| src/continuo/solve/orchestrator.py         |      110 |        2 |     98% |   271-272 |
-| src/continuo/solve/pf.py                   |      235 |       15 |     94% |351, 396, 398, 418-421, 446-447, 510, 521-522, 524, 539, 544 |
+| src/continuo/solve/orchestrator.py         |      123 |        2 |     98% |   346-347 |
+| src/continuo/solve/pf.py                   |      240 |       15 |     94% |358, 403, 405, 425-428, 453-454, 517, 528-529, 531, 546, 551 |
+| src/continuo/solve/refine.py               |       74 |        1 |     99% |       197 |
 | src/continuo/solve/rootfind.py             |      183 |        9 |     95% |102, 178, 187, 214, 266-267, 312, 329-330 |
 | src/continuo/solve/steady.py               |      115 |        0 |    100% |           |
 | src/continuo/solve/transform.py            |       92 |        0 |    100% |           |
-| **TOTAL**                                  | **3675** |  **174** | **95%** |           |
+| **TOTAL**                                  | **3905** |  **178** | **95%** |           |
 
 
 ## Setup coverage badge
