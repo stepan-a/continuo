@@ -76,13 +76,16 @@ class SteadyQuery:
     ``e={…}`` override expression. ``solver`` is the nonlinear-solver preset
     named in the directive (``None`` when unspecified, leaving the choice to
     ``auto`` / the caller), and ``options`` carries its ``options={…}``
-    mapping (``None`` when unspecified).
+    mapping (``None`` when unspecified). ``nodomain`` is the positional flag
+    that disables the domain change of variable (solve in raw ``x`` even when
+    the model declares constraints).
     """
 
     time: Expr | None
     exogenous: Expr | None
     solver: str | None = None
     options: dict[str, object] | None = None
+    nodomain: bool = False
 
 
 @dataclass

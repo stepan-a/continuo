@@ -37,6 +37,7 @@ from continuo.solve.rootfind import (
     select_steady_solver,
 )
 from continuo.solve.steady import (
+    directive_nodomain,
     directive_solver,
     directive_solver_options,
     evaluate_parameters,
@@ -48,6 +49,7 @@ __all__ = [
     "steady_state",
     "directive_solver",
     "directive_solver_options",
+    "directive_nodomain",
     "evaluate_parameters",
     "solve_pf",
     "solve_segment",

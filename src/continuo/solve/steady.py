@@ -42,7 +42,13 @@ from continuo.solve.transform import (
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["evaluate_parameters", "steady_state", "directive_solver", "directive_solver_options"]
+__all__ = [
+    "evaluate_parameters",
+    "steady_state",
+    "directive_solver",
+    "directive_solver_options",
+    "directive_nodomain",
+]
 
 
 def _first_solver_query(model: Model):
@@ -74,6 +80,15 @@ def directive_solver_options(model: Model) -> dict[str, Any] | None:
     return query.options if query is not None else None
 
 
+def directive_nodomain(model: Model) -> bool:
+    """Whether any ``steady`` directive carries the ``nodomain`` flag.
+
+    Lets a model file disable the domain change of variable once, for both
+    the standalone inspection and the run's internal solves.
+    """
+    return any(query.nodomain for query in model.steady_queries)
+
+
 _TOL = 1e-10
 _MAX_ITER = 50
 
@@ -98,6 +113,7 @@ def steady_state(
     guess: dict[str, float] | None = None,
     solver: str | SteadySolver | None = None,
     options: dict[str, Any] | None = None,
+    nodomain: bool = False,
     tol: float = _TOL,
     max_iter: int = _MAX_ITER,
 ) -> dict[str, float]:
@@ -109,13 +125,15 @@ def steady_state(
     :class:`~continuo.solve.rootfind.SteadySolver` instance, or ``None`` (the
     ``"auto"`` default). ``options`` configures the named preset (e.g.
     ``{"strategy": "picard"}`` for ``kinsol``); both are ignored on the
-    analytical path, which is a closed form.
+    analytical path, which is a closed form. ``nodomain`` disables the domain
+    change of variable, solving in raw ``x`` even when the model declares
+    constraints (debug, or to fall back when a solution saturates a bound).
     """
     theta = evaluate_parameters(model)
     e = dict(exogenous or {})
     if model.steady_state:
         return _analytical(model, theta, e)
-    return _numerical(model, theta, e, guess, solver, options, tol, max_iter)
+    return _numerical(model, theta, e, guess, solver, options, nodomain, tol, max_iter)
 
 
 # ---------------------------------------------------------------------------
@@ -144,6 +162,7 @@ def _numerical(
     guess: dict[str, float] | None,
     solver: str | SteadySolver | None,
     options: dict[str, Any] | None,
+    nodomain: bool,
     tol: float,
     max_iter: int,
 ) -> dict[str, float]:
@@ -153,7 +172,7 @@ def _numerical(
     e_vec = _vector(e.get(name, 0.0) for name in model.exogenous)
     xdot_zero = ca.DM.zeros(len(model.states) + len(model.jumps), 1)
 
-    if model.constraints:
+    if model.constraints and not nodomain:
         # Reparametrise: solve in the unconstrained y, keeping x = T(y) strictly
         # inside its declared domain, then map the solution back to x.
         transforms = build_transforms(model, theta, e)

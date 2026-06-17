@@ -225,6 +225,32 @@ def test_constrained_across_backends(solver):
     assert ss["K"] == pytest.approx(K_STAR, rel=1e-6)
 
 
+# --- the nodomain flag ----------------------------------------------------
+
+
+def test_nodomain_solves_in_raw_x():
+    # With nodomain the change of variable is skipped, so the same default
+    # guess that lands on K* under constraints drifts to the spurious root.
+    constrained = steady_state(model(CONSTRAINED))["K"]
+    raw = steady_state(model(CONSTRAINED), nodomain=True)["K"]
+    assert constrained == pytest.approx(K_STAR, rel=1e-6)
+    assert raw != pytest.approx(K_STAR, rel=1e-3)
+
+
+def test_nodomain_ignores_out_of_domain_guess():
+    # The guess validation belongs to the change of variable; nodomain skips
+    # it, so a guess outside the declared domain is accepted in raw x.
+    ss = steady_state(model(CONSTRAINED), nodomain=True, guess={"K": 20.0, "Y": 2.5})
+    assert ss["K"] == pytest.approx(K_STAR, rel=1e-6)
+
+
+def test_directive_nodomain_reads_the_flag():
+    from continuo.solve import directive_nodomain
+
+    assert directive_nodomain(model(CONSTRAINED + "steady(nodomain);")) is True
+    assert directive_nodomain(model(CONSTRAINED + "steady;")) is False
+
+
 def test_higher_order_auxiliary_steady_state_is_zero():
     src = (
         "var(state) x;\nvar Y;\n"

@@ -199,6 +199,34 @@ def test_steady_options_must_be_mapping():
         ir("steady(solver=kinsol, options=5);")
 
 
+# --- the nodomain flag ----------------------------------------------------
+
+
+def test_steady_nodomain_defaults_false():
+    assert ir("steady;").steady_queries[0].nodomain is False
+
+
+def test_steady_nodomain_flag_parsed():
+    assert ir("steady(nodomain);").steady_queries[0].nodomain is True
+
+
+def test_steady_nodomain_combines_with_kwargs():
+    q = ir("steady(t=5, nodomain, solver=newton);").steady_queries[0]
+    assert q.nodomain is True
+    assert q.time.value == 5.0
+    assert q.solver == "newton"
+
+
+def test_steady_rejects_unknown_flag():
+    with pytest.raises(IRError, match="unknown steady flag 'bogus'"):
+        ir("steady(bogus);")
+
+
+def test_steady_rejects_duplicate_flag():
+    with pytest.raises(IRError, match="duplicate steady flag 'nodomain'"):
+        ir("steady(nodomain, nodomain);")
+
+
 # --- multiple commands ----------------------------------------------------
 
 

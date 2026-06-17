@@ -157,6 +157,39 @@ def test_steady_directive_options_used_by_default():
     assert model.steady_state()["K"] == pytest.approx(_NUMERIC_K, rel=1e-6)
 
 
+# A constrained numerical model: bounds steer the default-guess solve to the
+# interior root K*, where the raw-x solve drifts to the spurious K≈0 root.
+CONSTRAINED = """
+var(state, boundaries=(0.5, 1000)) K;
+var(positive) Y;
+parameters alpha, delta;
+alpha = 0.3;
+delta = 0.1;
+model;
+  diff(K) = Y - delta * K;
+  Y = K^alpha;
+end;
+"""
+
+
+def test_steady_state_nodomain_overrides_constraints():
+    model = continuo.parse_string(CONSTRAINED)
+    assert model.steady_state()["K"] == pytest.approx(_NUMERIC_K, rel=1e-6)
+    assert model.steady_state(nodomain=True)["K"] != pytest.approx(_NUMERIC_K, rel=1e-3)
+
+
+def test_steady_directive_nodomain_used_by_default():
+    model = continuo.parse_string(CONSTRAINED + "\nsteady(nodomain);")
+    # The directive disables the change of variable; the solve drifts off K*.
+    assert model.steady_state()["K"] != pytest.approx(_NUMERIC_K, rel=1e-3)
+
+
+def test_explicit_nodomain_false_overrides_the_directive():
+    model = continuo.parse_string(CONSTRAINED + "\nsteady(nodomain);")
+    # An explicit nodomain=False beats the directive, restoring the constraint.
+    assert model.steady_state(nodomain=False)["K"] == pytest.approx(_NUMERIC_K, rel=1e-6)
+
+
 def test_explicit_solver_overrides_the_directive():
     used: list[str] = []
 

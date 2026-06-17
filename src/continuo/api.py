@@ -21,6 +21,7 @@ from continuo.parser import parse as _parse_text
 from continuo.solve import (
     LinearSolver,
     SteadySolver,
+    directive_nodomain,
     directive_solver,
     directive_solver_options,
     simulate,
@@ -77,6 +78,7 @@ class Model:
         exogenous: dict[str, float] | None = None,
         solver: str | SteadySolver | None = None,
         options: dict[str, object] | None = None,
+        nodomain: bool | None = None,
     ) -> dict[str, float]:
         """Compute the steady state at the given exogenous configuration.
 
@@ -86,13 +88,24 @@ class Model:
         to the model's ``steady(solver=…)`` directive, then to ``"auto"``.
         ``options`` configures a named preset (e.g. ``{"strategy": "picard"}``
         for ``kinsol``); when both are omitted, the directive's ``solver`` and
-        ``options`` are used.
+        ``options`` are used. ``nodomain`` disables the domain change of
+        variable (solve in raw ``x`` despite declared constraints); ``None``
+        defers to the model's ``steady(nodomain)`` directive, an explicit
+        bool overrides it.
         """
         if solver is None:
             solver = directive_solver(self._model)
             if options is None:
                 options = directive_solver_options(self._model)
-        return steady_state(self._model, exogenous=exogenous, solver=solver, options=options)
+        if nodomain is None:
+            nodomain = directive_nodomain(self._model)
+        return steady_state(
+            self._model,
+            exogenous=exogenous,
+            solver=solver,
+            options=options,
+            nodomain=nodomain,
+        )
 
     def simul(
         self,

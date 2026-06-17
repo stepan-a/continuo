@@ -59,6 +59,9 @@ _STEADY_SOLVERS = {
     "homotopy",
 }
 
+# Bare positional flags the steady directive recognises.
+_STEADY_FLAGS = {"nodomain"}
+
 
 def attach_commands(model: Model, model_file: ModelFile) -> Model:
     """Validate the simulate / steady commands and attach them to the model."""
@@ -152,8 +155,7 @@ def _check_positive(name: str, expr: Expr, *, integer: bool) -> None:
 
 
 def _steady(cmd: SteadyCommand) -> SteadyQuery:
-    if cmd.args:
-        raise IRError("steady takes keyword arguments only (t=…, e={…})", cmd.pos)
+    flags = _steady_flags(cmd.args)
     kwargs = _collect(cmd.kwargs, allowed=("t", "e", "solver", "options"), what="steady")
     time = kwargs.get("t")
     if time is not None:
@@ -173,7 +175,26 @@ def _steady(cmd: SteadyCommand) -> SteadyQuery:
         exogenous,
         _steady_solver(kwargs.get("solver")),
         _steady_options(kwargs.get("options")),
+        nodomain="nodomain" in flags,
     )
+
+
+def _steady_flags(args: list[Expr]) -> set[str]:
+    """Collect the bare positional flags of a steady directive (e.g. nodomain)."""
+    flags: set[str] = set()
+    for arg in args:
+        if not isinstance(arg, Identifier) or arg.name not in _STEADY_FLAGS:
+            name = arg.name if isinstance(arg, Identifier) else None
+            raise IRError(
+                f"unknown steady flag {name!r}"
+                if name is not None
+                else "steady positional arguments must be flags (e.g. nodomain)",
+                getattr(arg, "pos", None),
+            )
+        if arg.name in flags:
+            raise IRError(f"duplicate steady flag {arg.name!r}", arg.pos)
+        flags.add(arg.name)
+    return flags
 
 
 def _steady_solver(value: Expr | None) -> str | None:
