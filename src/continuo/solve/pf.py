@@ -391,8 +391,15 @@ def _newton(
             raise SolveError("singular Jacobian in the perfect-foresight solve")
         # Carry the accepted line-search residual into the next iteration (its
         # norm is the convergence test), so the residual is evaluated once per
-        # step instead of being recomputed at the top of the loop.
-        x, g = _line_search(x, step, current, residual)
+        # step instead of being recomputed at the top of the loop. A failed line
+        # search (no descent) stops the solve rather than stepping anyway.
+        stepped = _line_search(x, step, current, residual)
+        if stepped is None:
+            raise SolveError(
+                "perfect-foresight Newton stalled: the line search found no "
+                "residual-decreasing step; refine the grid or supply a better initial_guess"
+            )
+        x, g = stepped
     raise SolveError(
         "perfect-foresight solve did not converge; refine the grid or supply a better initial_guess"
     )
@@ -437,11 +444,13 @@ def _degraded(rcond: float | None) -> bool:
 
 def _line_search(
     x: np.ndarray, step: np.ndarray, base: float, residual: Callable[[np.ndarray], np.ndarray]
-) -> tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray] | None:
     """Backtrack to a residual-decreasing step, returning ``(candidate, residual)``.
 
     Returns the accepted candidate together with its residual vector so the
-    caller can reuse it as the next iterate's residual without re-evaluating.
+    caller can reuse it as the next iterate's residual without re-evaluating, or
+    ``None`` when no step in the backtracking sequence reduces the residual norm
+    — so the caller stops rather than take a non-descent step.
     """
     alpha = 1.0
     for _ in range(_LINE_SEARCH_STEPS):
@@ -450,8 +459,7 @@ def _line_search(
         if np.linalg.norm(g, np.inf) < base:
             return candidate, g
         alpha *= 0.5
-    candidate = x + alpha * step
-    return candidate, residual(candidate)
+    return None
 
 
 class _JacobianToCsc:
