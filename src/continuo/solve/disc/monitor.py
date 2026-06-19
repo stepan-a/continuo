@@ -84,7 +84,7 @@ class MonitorInput:
 
     grid: Grid
     path: np.ndarray  # (N+1, n) node values
-    order: int = 2  # the scheme's global order (for Richardson)
+    order: int | None = None  # scheme order p; required by Richardson, unused elsewhere
     refined: tuple[Grid, np.ndarray] | None = None  # (bisected grid, its path)
     dynamic_residual: DynamicResidual | None = None  # for the residual monitor
     n_dynamic: int = 0
@@ -114,6 +114,8 @@ class RichardsonMonitor:
     def assess(self, data: MonitorInput) -> GridError:
         if data.refined is None:
             raise SolveError("the richardson monitor needs a refined solution")
+        if data.order is None:
+            raise SolveError("the richardson monitor needs the scheme order")
         return _richardson(data.path, data.refined[1], data.order)
 
 
