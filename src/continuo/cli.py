@@ -52,7 +52,11 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     output = Path(args.output) if args.output else Path(args.model).with_suffix(".csv")
-    _write_csv(solution, output)
+    try:
+        _write_csv(solution, output)
+    except OSError as exc:
+        print(f"continuo: cannot write {str(output)!r}: {exc}", file=sys.stderr)
+        return 1
     print(f"continuo: wrote {len(solution.t)} rows to {output}")
     return 0
 

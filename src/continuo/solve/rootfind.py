@@ -264,11 +264,14 @@ class ScipyRootSolver:
         try:
             sol = root(problem.g, problem.x0, **kwargs)
         except Exception as exc:  # SciPy raises on some non-convergence paths
+            logger.debug("%s solve raised, treated as non-convergence", self.name, exc_info=exc)
             return RootResult(
                 np.array(problem.x0, float), False, 0, problem.norm(problem.x0), self.name, str(exc)
             )
         x = np.asarray(sol.x, dtype=float).reshape(-1)
         norm = problem.norm(x)
+        # Backend-defined iteration count: nit where SciPy reports it, else nfev —
+        # not directly comparable to the Newton / homotopy iteration counts.
         iterations = int(sol.get("nit", sol.get("nfev", 0))) if hasattr(sol, "get") else 0
         success = norm < tol
         message = "" if success else f"{self.method}: ‖g‖∞={norm:.2e} ≥ tol ({sol.message})"
@@ -327,6 +330,7 @@ class KinsolSolver:
             rf = ca.rootfinder("steady_kinsol", "kinsol", problem.residual_function, opts)
             x = np.array(rf(problem.x0)).reshape(-1)
         except Exception as exc:  # KINSOL throws on failure to converge
+            logger.debug("%s solve raised, treated as non-convergence", self.name, exc_info=exc)
             return RootResult(
                 np.array(problem.x0, float), False, 0, problem.norm(problem.x0), self.name, str(exc)
             )
