@@ -128,29 +128,44 @@ regenerate it with `python examples/benchmark_solvers.py --write`.
 
 | Model | n | superlu | klu | klu-nobtf | umfpack | pardiso |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| cagan | 201 | 17.7 | 17.0 | 23.5 | 16.7 | 337.5 |
-| dornbusch | 903 | 23.2 | 23.6 | 24.7 | 24.2 | 259.2 |
-| goodwin | 4802 | 136.0 | 134.5 | 131.8 | 139.2 | 389.5 |
-| nk | 1503 | 81.3 | 80.2 | 87.8 | 78.9 | 314.9 |
-| nk-nonlinear | 3005 | 123.1 | 118.6 | 120.7 | 121.9 | 365.0 |
-| rbc | 1004 | 29.7 | 28.2 | 30.0 | 28.1 | 274.4 |
-| solow | 602 | 26.8 | 26.7 | 25.5 | 26.3 | 260.1 |
-| tobinq | 903 | 31.9 | 30.1 | 30.6 | 30.4 | 263.8 |
+| cagan | 201 | 18.2 | 18.4 | 19.7 | 18.3 | 261.0 |
+| dornbusch | 903 | 23.3 | 23.8 | 23.4 | 23.6 | 261.1 |
+| goodwin | 4802 | 133.8 | 122.6 | 122.3 | 133.0 | 375.2 |
+| nk | 1503 | 79.5 | 82.5 | 79.8 | 79.2 | 318.0 |
+| nk-nonlinear | 3005 | 113.1 | 109.6 | 113.1 | 113.4 | 360.6 |
+| rbc | 1004 | 28.0 | 26.0 | 27.0 | 26.2 | 255.2 |
+| solow | 602 | 25.7 | 24.2 | 25.5 | 25.4 | 268.0 |
+| tobinq | 903 | 28.2 | 28.3 | 27.8 | 28.4 | 273.1 |
+
+**Isolated linear solve — refactor + solve, warm (µs)**
+
+| Model | n | superlu | klu | klu-nobtf | umfpack | pardiso |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| cagan | 201 | 44.7 | 11.3 | 11.0 | 18.5 | 459.4 |
+| dornbusch | 903 | 160.4 | 25.6 | 31.6 | 255.5 | 1004 |
+| goodwin | 4802 | 834.9 | 108.1 | 98.9 | 1299 | 2999 |
+| nk | 1503 | 275.0 | 42.2 | 45.9 | 447.0 | 2583 |
+| nk-nonlinear | 3005 | 476.2 | 62.4 | 129.9 | 868.8 | 2051 |
+| rbc | 1004 | 294.5 | 29.7 | 47.2 | 284.8 | 1218 |
+| solow | 602 | 117.1 | 20.4 | 18.3 | 136.3 | 530.9 |
+| tobinq | 903 | 135.6 | 24.8 | 25.7 | 184.0 | 982.0 |
 
 **Peak resident memory (MiB)**
 
 | Model | n | superlu | klu | klu-nobtf | umfpack | pardiso |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| cagan | 201 | 81 | 79 | 79 | 79 | 119 |
-| dornbusch | 903 | 82 | 80 | 80 | 82 | 124 |
-| goodwin | 4802 | 96 | 92 | 92 | 95 | 151 |
-| nk | 1503 | 84 | 81 | 82 | 83 | 129 |
-| nk-nonlinear | 3005 | 91 | 88 | 88 | 90 | 141 |
-| rbc | 1004 | 83 | 82 | 81 | 82 | 126 |
-| solow | 602 | 81 | 80 | 80 | 81 | 121 |
-| tobinq | 903 | 83 | 82 | 81 | 83 | 124 |
+| cagan | 201 | 102 | 100 | 100 | 101 | 139 |
+| dornbusch | 903 | 103 | 101 | 101 | 102 | 142 |
+| goodwin | 4802 | 116 | 113 | 112 | 114 | 169 |
+| nk | 1503 | 105 | 102 | 103 | 104 | 146 |
+| nk-nonlinear | 3005 | 112 | 108 | 109 | 110 | 158 |
+| rbc | 1004 | 105 | 103 | 102 | 103 | 144 |
+| solow | 602 | 103 | 101 | 101 | 101 | 141 |
+| tobinq | 903 | 105 | 102 | 103 | 103 | 142 |
 
-_Median of 5 runs of end-to-end `Model.simul()` (includes the CasADi build). Wall-clock in milliseconds; peak resident memory in MiB (whole process — the Python/CasADi/SciPy baseline dominates, and PARDISO loads MKL). Measured 2026-06-15 on AMD Ryzen AI 9 HX 370 w/ Radeon 890M, 24 cores, Python 3.13.12._
+**Reading these:** the wall-clock above is *end-to-end* `Model.simul()`, dominated by the (solver-independent) CasADi build and residual/Jacobian evaluation — so on these small models the linear backend barely moves it. KLU's edge is in the linear solve itself: the isolated `refactor + solve` table (the warm per-Newton-step cost) shows it ~4–10× faster than SuperLU, a gap that grows with problem size and Newton iterations. PARDISO is far slower here only because MKL oversubscribes threads on these tiny systems — reserve it for large models. See the [Linear solvers](https://continuo.adjemian.eu/solvers.html) manual page for the full isolated tables.
+
+_Median of 5 runs of end-to-end `Model.simul()` (includes the CasADi build). Wall-clock in milliseconds; peak resident memory in MiB (whole process — the Python/CasADi/SciPy baseline dominates, and PARDISO loads MKL). Measured 2026-06-19 on AMD Ryzen AI 9 HX 370 w/ Radeon 890M, 24 cores, Python 3.13.14._
 
 <!-- BENCHMARK:END -->
 

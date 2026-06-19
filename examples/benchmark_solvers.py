@@ -264,6 +264,47 @@ def _md(data: dict, micro: bool) -> str:
     return body + f"\n\n_{_caption(data, micro)}_"
 
 
+_README_NOTE = (
+    "**Reading these:** the wall-clock above is *end-to-end* `Model.simul()`, "
+    "dominated by the (solver-independent) CasADi build and residual/Jacobian "
+    "evaluation — so on these small models the linear backend barely moves it. "
+    "KLU's edge is in the linear solve itself: the isolated `refactor + solve` "
+    "table (the warm per-Newton-step cost) shows it ~4–10× faster than SuperLU, a "
+    "gap that grows with problem size and Newton iterations. PARDISO is far slower "
+    "here only because MKL oversubscribes threads on these tiny systems — reserve "
+    "it for large models. See the "
+    "[Linear solvers](https://continuo.adjemian.eu/solvers.html) manual page for "
+    "the full isolated tables."
+)
+
+
+def _readme_md(end_data: dict, micro_data: dict) -> str:
+    """README block: the end-to-end tables, the isolated refactor+solve table from
+    ``micro_data``, and a note on why the backend barely moves the end-to-end time."""
+    solvers = end_data["solvers"]
+    head = ["Model", "n", *solvers]
+    sep = ["---", "---:", *["---:"] * len(solvers)]
+
+    def table(data: dict, title: str, key: str) -> str:
+        cell = _cell(key)
+        lines = [f"**{title}**", "", "| " + " | ".join(head) + " |", "| " + " | ".join(sep) + " |"]
+        for r in data["rows"]:
+            size = str(r["size"]) if r["size"] else "—"
+            row = [r["label"], size, *[cell(r["cells"][s]) for s in solvers]]
+            lines.append("| " + " | ".join(row) + " |")
+        return "\n".join(lines)
+
+    blocks = [
+        table(end_data, "Wall-clock per solve (median, ms)", "median_ms"),
+        table(
+            micro_data, "Isolated linear solve — refactor + solve, warm (µs)", "refactor_solve_us"
+        ),
+        table(end_data, "Peak resident memory (MiB)", "peak_rss_kb"),
+        _README_NOTE,
+    ]
+    return "\n\n".join(blocks) + f"\n\n_{_caption(end_data, False)}_"
+
+
 def _rst(data: dict, micro: bool) -> str:
     solvers = data["solvers"]
     head = ["Model", "n", *solvers]
@@ -316,8 +357,13 @@ def main() -> None:
         if args.micro:
             _inject(REPO / "doc/manual/solvers.rst", START_MICRO, END_MICRO, _rst(data, True))
         else:
-            _inject(REPO / "README.md", START_MD, END_MD, _md(data, False))
+            # The README pairs the end-to-end tables with the isolated
+            # refactor+solve table, so measure both and regenerate every region
+            # (README + the manual's end-to-end and micro tables) from one run.
+            micro_data = run(args.reps, True)
+            _inject(REPO / "README.md", START_MD, END_MD, _readme_md(data, micro_data))
             _inject(REPO / "doc/manual/solvers.rst", START_RST, END_RST, _rst(data, False))
+            _inject(REPO / "doc/manual/solvers.rst", START_MICRO, END_MICRO, _rst(micro_data, True))
 
 
 if __name__ == "__main__":

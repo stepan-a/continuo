@@ -115,7 +115,7 @@ The backends
    A ``ctypes`` wrapper over SuiteSparse KLU. KLU separates the symbolic
    analysis from the numeric factorisation and reuses it across
    refactorisations, so each Newton step is a cheap ``refactor`` rather
-   than a full factorisation — the main reason it is ~4–7× faster than
+   than a full factorisation — the main reason it is ~4–10× faster than
    SuperLU here (see the benchmarks below). It also pre-orders into block
    triangular form (BTF),
    which on these models only peels the algebraic and boundary rows as
@@ -214,60 +214,60 @@ oversubscribes and inflates its numbers (see the note above).
      - pardiso
    * - cagan
      - 201
-     - 17.7
-     - 17.0
-     - 23.5
-     - 16.7
-     - 337.5
+     - 18.2
+     - 18.4
+     - 19.7
+     - 18.3
+     - 261.0
    * - dornbusch
      - 903
-     - 23.2
+     - 23.3
+     - 23.8
+     - 23.4
      - 23.6
-     - 24.7
-     - 24.2
-     - 259.2
+     - 261.1
    * - goodwin
      - 4802
-     - 136.0
-     - 134.5
-     - 131.8
-     - 139.2
-     - 389.5
+     - 133.8
+     - 122.6
+     - 122.3
+     - 133.0
+     - 375.2
    * - nk
      - 1503
-     - 81.3
-     - 80.2
-     - 87.8
-     - 78.9
-     - 314.9
+     - 79.5
+     - 82.5
+     - 79.8
+     - 79.2
+     - 318.0
    * - nk-nonlinear
      - 3005
-     - 123.1
-     - 118.6
-     - 120.7
-     - 121.9
-     - 365.0
+     - 113.1
+     - 109.6
+     - 113.1
+     - 113.4
+     - 360.6
    * - rbc
      - 1004
-     - 29.7
-     - 28.2
-     - 30.0
-     - 28.1
-     - 274.4
+     - 28.0
+     - 26.0
+     - 27.0
+     - 26.2
+     - 255.2
    * - solow
      - 602
-     - 26.8
-     - 26.7
+     - 25.7
+     - 24.2
      - 25.5
-     - 26.3
-     - 260.1
+     - 25.4
+     - 268.0
    * - tobinq
      - 903
-     - 31.9
-     - 30.1
-     - 30.6
-     - 30.4
-     - 263.8
+     - 28.2
+     - 28.3
+     - 27.8
+     - 28.4
+     - 273.1
 
 .. list-table:: Peak resident memory (MiB)
    :header-rows: 1
@@ -281,62 +281,62 @@ oversubscribes and inflates its numbers (see the note above).
      - pardiso
    * - cagan
      - 201
-     - 81
-     - 79
-     - 79
-     - 79
-     - 119
+     - 102
+     - 100
+     - 100
+     - 101
+     - 139
    * - dornbusch
      - 903
-     - 82
-     - 80
-     - 80
-     - 82
-     - 124
+     - 103
+     - 101
+     - 101
+     - 102
+     - 142
    * - goodwin
      - 4802
-     - 96
-     - 92
-     - 92
-     - 95
-     - 151
+     - 116
+     - 113
+     - 112
+     - 114
+     - 169
    * - nk
      - 1503
-     - 84
-     - 81
-     - 82
-     - 83
-     - 129
+     - 105
+     - 102
+     - 103
+     - 104
+     - 146
    * - nk-nonlinear
      - 3005
-     - 91
-     - 88
-     - 88
-     - 90
-     - 141
+     - 112
+     - 108
+     - 109
+     - 110
+     - 158
    * - rbc
      - 1004
-     - 83
-     - 82
-     - 81
-     - 82
-     - 126
+     - 105
+     - 103
+     - 102
+     - 103
+     - 144
    * - solow
      - 602
-     - 81
-     - 80
-     - 80
-     - 81
-     - 121
+     - 103
+     - 101
+     - 101
+     - 101
+     - 141
    * - tobinq
      - 903
-     - 83
-     - 82
-     - 81
-     - 83
-     - 124
+     - 105
+     - 102
+     - 103
+     - 103
+     - 142
 
-Median of 5 runs of end-to-end ``Model.simul()`` (includes the CasADi build). Wall-clock in milliseconds; peak resident memory in MiB (whole process — the Python/CasADi/SciPy baseline dominates, and PARDISO loads MKL). Measured 2026-06-15 on AMD Ryzen AI 9 HX 370 w/ Radeon 890M, 24 cores, Python 3.13.12.
+Median of 5 runs of end-to-end ``Model.simul()`` (includes the CasADi build). Wall-clock in milliseconds; peak resident memory in MiB (whole process — the Python/CasADi/SciPy baseline dominates, and PARDISO loads MKL). Measured 2026-06-19 on AMD Ryzen AI 9 HX 370 w/ Radeon 890M, 24 cores, Python 3.13.14.
 
 .. BENCHMARK END
 
@@ -366,60 +366,60 @@ in full. Regenerate with ``python examples/benchmark_solvers.py --micro --write`
      - pardiso
    * - cagan
      - 201
-     - 58.1
-     - 13.9
-     - 20.8
-     - 18.0
-     - 366.0
+     - 46.1
+     - 14.2
+     - 15.3
+     - 19.3
+     - 463.8
    * - dornbusch
      - 903
-     - 158.9
-     - 67.3
-     - 151.0
-     - 324.3
-     - 1701
+     - 159.6
+     - 47.4
+     - 93.2
+     - 255.1
+     - 1163
    * - goodwin
      - 4802
-     - 843.8
-     - 338.5
-     - 190.7
-     - 1265
-     - 2952
+     - 854.8
+     - 341.6
+     - 191.4
+     - 1304
+     - 4063
    * - nk
      - 1503
-     - 275.5
-     - 109.9
-     - 181.5
-     - 429.9
-     - 2704
+     - 281.1
+     - 109.7
+     - 193.1
+     - 443.1
+     - 2604
    * - nk-nonlinear
      - 3005
-     - 510.3
-     - 164.0
-     - 503.2
-     - 909.2
-     - 2136
+     - 482.8
+     - 164.3
+     - 520.2
+     - 869.2
+     - 2339
    * - rbc
      - 1004
-     - 256.5
-     - 73.7
-     - 160.1
-     - 272.2
-     - 1418
+     - 329.3
+     - 52.7
+     - 189.4
+     - 284.7
+     - 1942
    * - solow
      - 602
-     - 171.8
-     - 51.6
-     - 37.4
-     - 231.3
-     - 702.9
+     - 117.0
+     - 52.6
+     - 37.2
+     - 135.4
+     - 761.2
    * - tobinq
      - 903
-     - 134.8
-     - 60.0
-     - 58.7
-     - 182.8
-     - 657.1
+     - 135.3
+     - 41.3
+     - 59.8
+     - 183.7
+     - 1211
 
 .. list-table:: refactor + solve — warm, amortised analysis (µs)
    :header-rows: 1
@@ -433,61 +433,61 @@ in full. Regenerate with ``python examples/benchmark_solvers.py --micro --write`
      - pardiso
    * - cagan
      - 201
-     - 57.2
-     - 14.8
-     - 14.7
-     - 17.7
-     - 359.6
+     - 44.7
+     - 11.3
+     - 11.0
+     - 18.5
+     - 459.4
    * - dornbusch
      - 903
-     - 158.6
-     - 34.4
-     - 52.2
-     - 318.1
-     - 1359
+     - 160.4
+     - 25.6
+     - 31.6
+     - 255.5
+     - 1004
    * - goodwin
      - 4802
-     - 829.5
-     - 107.3
-     - 98.3
-     - 1272
-     - 2991
+     - 834.9
+     - 108.1
+     - 98.9
+     - 1299
+     - 2999
    * - nk
      - 1503
-     - 268.8
-     - 41.6
-     - 44.9
-     - 428.8
-     - 2383
+     - 275.0
+     - 42.2
+     - 45.9
+     - 447.0
+     - 2583
    * - nk-nonlinear
      - 3005
-     - 463.4
-     - 61.5
-     - 121.0
-     - 908.6
-     - 3038
+     - 476.2
+     - 62.4
+     - 129.9
+     - 868.8
+     - 2051
    * - rbc
      - 1004
-     - 280.8
-     - 39.3
-     - 47.9
-     - 272.2
-     - 1386
+     - 294.5
+     - 29.7
+     - 47.2
+     - 284.8
+     - 1218
    * - solow
      - 602
-     - 116.2
-     - 19.9
-     - 18.5
-     - 231.5
-     - 541.8
+     - 117.1
+     - 20.4
+     - 18.3
+     - 136.3
+     - 530.9
    * - tobinq
      - 903
-     - 135.3
-     - 33.6
+     - 135.6
+     - 24.8
      - 25.7
-     - 183.1
-     - 662.5
+     - 184.0
+     - 982.0
 
-Median of 100 repetitions, timing only the linear-solve phases on each model's real stacked Jacobian (the CasADi build is excluded). ``refactor + solve`` is the dominant per-iteration cost once the analysis is amortised. Measured 2026-06-15 on AMD Ryzen AI 9 HX 370 w/ Radeon 890M, 24 cores, Python 3.13.12.
+Median of 50 repetitions, timing only the linear-solve phases on each model's real stacked Jacobian (the CasADi build is excluded). ``refactor + solve`` is the dominant per-iteration cost once the analysis is amortised. Measured 2026-06-19 on AMD Ryzen AI 9 HX 370 w/ Radeon 890M, 24 cores, Python 3.13.14.
 
 .. MICROBENCH END
