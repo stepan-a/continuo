@@ -4,6 +4,7 @@
 \usepackage[T1]{fontenc}
 \usepackage[english,provide=*]{babel}
 \usepackage{amsmath,amssymb,amsfonts}
+\usepackage[scr=rsfs]{mathalpha}
 \usepackage{mathtools}
 \usepackage{bm}
 \usepackage{tikz}
@@ -299,8 +300,10 @@
   collocation points used by some schemes to evaluate the model
   inside each interval.\newline
 
-\item By default a uniform grid between $0$ and $T$ is considered;  the spacing $dt$ is the
-  same for every interval.
+\item The default grid is uniform ($dt$ the same everywhere), but the
+  nodes need not be: Continuo aligns them to shock reveal times and can
+  refine them \textbf{adaptively} where the solution is hard (see
+  \emph{Grids and numerical experiments}).
 
 \end{itemize}
 
@@ -656,19 +659,21 @@
       $(1,0)$       & Forward Euler                              & $1$, conditional \\
       $(0,1)$       & Backward Euler                             & $1$, A- \& L-stable \\
       $(1,1)$       & \textbf{Crank--Nicolson} / impl.\ midpoint & $2$, A-stable \\
-      $(s,s)$       & Gauss--Legendre IRK ($s$ stages)           & $2s$, A-stable \\
+      $(s,s)$       & Gauss--Legendre ($s$ stages)               & $2s$, A-stable, symmetric \\
       $(s{-}1,s)$   & Radau IIA ($s$ stages)                     & $2s{-}1$, L-stable \\
+      $(s{-}1,s{-}1)$ & Lobatto IIIA ($s$ stages)                & $2s{-}2$, A-stable, endpoint nodes \\
       \bottomrule
     \end{tabular}
   \end{center}
 
 \medskip
-  
-\item \textbf{Why $(1,1)$ for Continuo.} The smallest A-stable
-  Padé approximant of $e^z$ that is also second-order. One implicit
-  solve per step — same cost as backward Euler — for one extra order
-  of accuracy. Higher entries need multiple internal stages; Radau IIA
-  wins on stiff problems and is a planned alternative.
+
+\item \textbf{Crank--Nicolson is the default}: the smallest A-stable,
+  second-order entry — one implicit solve per step. The higher families
+  are now implemented too (\texttt{scheme=gauss\,/\,radau\,/\,lobatto\_iiia},
+  with \texttt{order=}); Gauss\,$2$ is exactly Crank--Nicolson, and
+  Lobatto IIIA\,$2$ is the trapezoidal rule. Radau IIA is the L-stable
+  choice for stiff problems.
 
 \end{itemize}
 
@@ -1137,6 +1142,199 @@ closest); halving $dt$ divides CN's max error by four ($0.068\to0.018$) —
 
 \end{frame}
 
+\begin{frame}{Collocation -- Sampling the dynamics}
+
+\begin{itemize}
+
+\item To step from $x_i$ to $x_{i+1}$ we need the slope $\dot x = g(x,t)$
+  \emph{inside} the interval. Crank--Nicolson uses \textbf{one} sample, at
+  the midpoint.\newline
+
+\item For more accuracy, sample the slope at $s$ interior \textbf{stage
+  points} $\tau_j = t_i + c_j\,dt$ (with $0\le c_j\le 1$) and combine them
+  — a \textbf{Runge--Kutta} method:
+
+\end{itemize}
+
+\begin{center}
+\begin{tikzpicture}[scale=1]
+  \draw[thick,darkblue] (0,0) -- (7,0);
+  \foreach \x/\lab in {0/$t_i$,7/$t_{i+1}$}
+    \draw[thick,darkblue] (\x,-0.12) -- (\x,0.12) node[above=2pt] {\lab};
+  \foreach \x/\lab in {1.4/$\tau_1$,5.6/$\tau_2$}
+    \filldraw[darkred] (\x,0) circle (2.2pt) node[above=4pt,darkred] {\lab};
+  \draw[decorate,decoration={brace,amplitude=4pt},darkblue]
+    (0,-0.55) -- (7,-0.55) node[midway,below=5pt] {one step $dt$};
+\end{tikzpicture}
+\end{center}
+
+\begin{itemize}
+\item \emph{Collocation} picks the $c_j$ as good quadrature nodes; the
+  $s=1$ midpoint choice \emph{is} Crank--Nicolson.
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Collocation -- Reading a Butcher tableau}
+
+\begin{itemize}
+
+\item A Runge--Kutta method is fully described by a small table — the
+  \textbf{Butcher tableau}:
+  \[
+  \begin{array}{c|c} c & A \\[2pt] \hline \rule{0pt}{2.2ex} & b^\top \end{array}
+  \qquad
+  \begin{aligned}
+  c_j &: \text{\emph{where} stage } j \text{ sits in the step};\\
+  b_j &: \text{its \emph{weight} in the final update};\\
+  A_{j\ell} &: \text{how stage } j \text{ uses the other stages.}
+  \end{aligned}
+  \]
+
+\item The one-stage methods read at a glance (update formula recalled
+  below each):
+  \begin{center}
+    \renewcommand{\arraystretch}{1.1}
+    \begin{tabular}{ccc}
+      $\begin{array}{c|c} 0 & 0 \\ \hline & 1 \end{array}$ &
+      $\begin{array}{c|c} 1 & 1 \\ \hline & 1 \end{array}$ &
+      $\begin{array}{c|c} \tfrac12 & \tfrac12 \\ \hline & 1 \end{array}$ \\[3pt]
+      forward Euler & backward Euler & impl.\ midpoint = CN \\[1pt]
+      {\scriptsize $x_{i+1}=x_i+dt\,g(x_i,t_i)$} &
+      {\scriptsize $x_{i+1}=x_i+dt\,g(x_{i+1},t_{i+1})$} &
+      {\scriptsize $x_{i+1}=x_i+dt\,g\!\bigl(\tfrac{x_i+x_{i+1}}{2},t_{i+\frac12}\bigr)$} \\
+    \end{tabular}
+  \end{center}
+  one slope, taken at the start / end / middle of the step, full weight
+  $b=1$. A non-zero $A$ means the stage is \textbf{implicit} (it depends
+  on the unknown $x_{i+1}$).
+
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Collocation -- Stages and the ``dynamic derivative''}
+
+\begin{itemize}
+
+\item At each stage we need the slope. Only the \textbf{dynamic} variables
+  (states $+$ jumps) \emph{have} a time derivative; the \textbf{algebraic}
+  ones do not. So the unknown per stage is $V_j$, the derivative
+  $\dot x$ of the dynamic components at $\tau_j$ — the \emph{dynamic
+  derivative}.\newline
+
+\item The stage \textbf{state} is rebuilt from those slopes,
+  \[
+  Z_j^d = x_i^d + dt\textstyle\sum_\ell A_{j\ell} V_\ell,
+  \]
+  (the algebraic part of $Z_j$ comes out of the model). Two conditions per
+  interval:
+  \[
+  \underbrace{F\!\bigl(V_j, Z_j, e(\tau_j), \theta, \tau_j\bigr)=0}_{\text{model holds at each stage}}
+  \qquad
+  \underbrace{x_{i+1}^d = x_i^d + dt\textstyle\sum_j b_j V_j}_{\text{combine the slopes}} .
+  \]
+
+\item \textbf{Check $s=1$} ($c=\tfrac12, A=\tfrac12, b=1$):
+  $V_1=\tfrac{x_{i+1}^d-x_i^d}{dt}$ and $Z_1=\tfrac{x_i+x_{i+1}}{2}$ —
+  exactly Crank--Nicolson. CN is the one-stage member.
+
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Collocation -- Gauss--Legendre}
+
+\begin{itemize}
+\item Interior nodes (the Gauss points), none at the ends; \textbf{symmetric},
+  \textbf{A-stable}, order $2s$. $s{=}1$ is Crank--Nicolson; the two-stage
+  member (order 4), with stage slopes $k_j$ and $c_{1,2}=\tfrac12\mp\tfrac{\sqrt3}{6}$, is
+\end{itemize}
+
+\begin{center}
+\small
+$\begin{array}{c|cc}
+  \tfrac12-\tfrac{\sqrt3}{6} & \tfrac14 & \tfrac14-\tfrac{\sqrt3}{6}\\[2pt]
+  \tfrac12+\tfrac{\sqrt3}{6} & \tfrac14+\tfrac{\sqrt3}{6} & \tfrac14\\ \hline
+  & \tfrac12 & \tfrac12
+\end{array}$
+\quad
+$\begin{aligned}[t]
+k_1 &= g\bigl(x_i + dt(\tfrac14 k_1 + (\tfrac14{-}\tfrac{\sqrt3}{6})k_2),\; t_i{+}c_1 dt\bigr),\\
+k_2 &= g\bigl(x_i + dt((\tfrac14{+}\tfrac{\sqrt3}{6})k_1 + \tfrac14 k_2),\; t_i{+}c_2 dt\bigr),\\
+x_{i+1} &= x_i + \tfrac{dt}{2}\,(k_1 + k_2).
+\end{aligned}$
+\end{center}
+
+\begin{itemize}
+\item Stages $\to$ order: $s=1,2,3 \Rightarrow 2,4,6$. \quad
+  \texttt{scheme=gauss, order=4}.
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Collocation -- Radau IIA}
+
+\begin{itemize}
+\item Last node at the \textbf{right endpoint} ($c_s=1$); \textbf{stiffly
+  accurate} ($b$ is the last row of $A$), \textbf{L-stable}, order $2s{-}1$.
+  $s{=}1$ is backward Euler; the two-stage member (order 3) is
+\end{itemize}
+
+\begin{center}
+\small
+$\begin{array}{c|cc}
+  \tfrac13 & \tfrac{5}{12} & -\tfrac1{12}\\[2pt] 1 & \tfrac34 & \tfrac14\\ \hline
+  & \tfrac34 & \tfrac14
+\end{array}$
+\quad
+$\begin{aligned}[t]
+k_1 &= g\bigl(x_i + dt(\tfrac{5}{12} k_1 - \tfrac1{12} k_2),\; t_i{+}\tfrac{dt}{3}\bigr),\\
+k_2 &= g\bigl(x_i + dt(\tfrac34 k_1 + \tfrac14 k_2),\; t_{i+1}\bigr),\\
+x_{i+1} &= x_i + dt(\tfrac34 k_1 + \tfrac14 k_2)\ \;(= \text{stage }2).
+\end{aligned}$
+\end{center}
+
+\begin{itemize}
+\item Stages $\to$ order: $s=1,2,3 \Rightarrow 1,3,5$. \quad
+  \texttt{scheme=radau, order=5}.
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Collocation -- Lobatto IIIA}
+
+\begin{itemize}
+\item \textbf{Both endpoints} are nodes ($c_1=0,\,c_s=1$), so the first row
+  of $A$ vanishes ($k_1=g(x_i,t_i)$ is explicit). \textbf{A-stable}, order
+  $2s{-}2$ — the classic BVP collocation (\texttt{bvp4c}). $s{=}2$ is the
+  trapezoidal rule; the three-stage member (order 4) is
+\end{itemize}
+
+\begin{center}
+\small
+$\begin{array}{c|ccc}
+  0 & 0 & 0 & 0\\
+  \tfrac12 & \tfrac{5}{24} & \tfrac13 & -\tfrac1{24}\\
+  1 & \tfrac16 & \tfrac23 & \tfrac16\\ \hline
+  & \tfrac16 & \tfrac23 & \tfrac16
+\end{array}$
+\quad
+$\begin{aligned}[t]
+k_1 &= g(x_i,\, t_i),\\
+k_2 &= g\bigl(x_i + dt(\tfrac{5}{24} k_1 + \tfrac13 k_2 - \tfrac1{24} k_3),\; t_{i+\frac12}\bigr),\\
+k_3 &= g\bigl(x_i + dt(\tfrac16 k_1 + \tfrac23 k_2 + \tfrac16 k_3),\; t_{i+1}\bigr),\\
+x_{i+1} &= x_i + dt(\tfrac16 k_1 + \tfrac23 k_2 + \tfrac16 k_3).
+\end{aligned}$
+\end{center}
+
+\begin{itemize}
+\item Stages $\to$ order: $s=2,3,4 \Rightarrow 2,4,6$. \quad
+  \texttt{scheme=lobatto\_iiia, order=4}.
+\end{itemize}
+
+\end{frame}
+
 %==============================================================================
 \section{The stacked system}
 %==============================================================================
@@ -1456,6 +1654,299 @@ mainly because of BTF, but three effects:
 \end{frame}
 
 %==============================================================================
+\section{Grids and numerical experiments}
+%==============================================================================
+
+\begin{frame}{Grids -- Shock-aligned nodes}
+
+\begin{itemize}
+
+\item A reveal time $t_r$ is a \textbf{kink} in the path. Continuo builds
+  each segment's grid with an \emph{exact node} at $t_r$, so the kink is
+  resolved cleanly instead of being smeared across the nearest
+  interval.\newline
+
+\item This is automatic and needs no tuning: the segment boundaries of
+  the anticipated/surprise machinery are placed on the mesh by
+  construction.\newline
+
+\item It is the cheap, sure win — but it only handles the kinks we
+  \emph{know} in advance. An occasionally-binding constraint puts a kink
+  where the solution decides, not where a shock is revealed.
+
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Grids -- Adaptive refinement: equidistribution}
+
+\begin{itemize}
+
+\item A uniform grid wastes nodes on the easy stretches and starves the
+  hard ones. Instead attach a \textbf{difficulty weight} $w_i$ to each
+  interval and make it \emph{equal} across intervals — the
+  \textbf{equidistribution} principle (de Boor; COLSYS;
+  \texttt{bvp4c}/\texttt{bvp5c}).\newline
+
+\item The loop: \emph{solve} on the current mesh, \emph{measure} $w_i$,
+  \emph{bisect} the intervals whose $w_i$ exceeds the average,
+  \emph{re-solve} — until a global error estimate drops below the
+  tolerance, or a node cap is reached.\newline
+
+\item Refinement only \emph{adds} nodes, so reveal and terminal times stay
+  pinned. Switched on with \texttt{simulate(\ldots, adapt=1e-5, monitor=\ldots)}.
+
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Grids -- The curvature monitor (where to refine)}
+
+\begin{itemize}
+\item The interpolation error on an interval scales like $h_i^2\,|x''|$, so
+  the hard intervals are where the solution \textbf{bends}. Curvature is the
+  \textbf{change of slope} between the two neighbouring secants:
+\end{itemize}
+
+\begin{center}
+\begin{tikzpicture}[scale=0.72]
+  \draw[->,thick,darkblue] (-0.3,0) -- (6.4,0) node[right] {$t$};
+  \coordinate (A) at (0,0.5); \coordinate (B) at (2,1.9); \coordinate (C) at (5,2.5);
+  \draw[very thick,darkred]   (A) -- (B) node[midway,above left=-2pt,darkred,font=\scriptsize]  {$s_L$};
+  \draw[very thick,darkgreen] (B) -- (C) node[midway,above=0pt,darkgreen,font=\scriptsize] {$s_R$};
+  \foreach \p in {A,B,C} \filldraw[darkblue] (\p) circle (1.7pt);
+  \node[font=\scriptsize,above left=-1pt] at (A) {$x_{j-1}$};
+  \node[font=\scriptsize,left=1pt] at (B) {$x_j$};
+  \node[font=\scriptsize,right=1pt] at (C) {$x_{j+1}$};
+  \foreach \x/\lab in {0/$t_{j-1}$,2/$t_j$,5/$t_{j+1}$}
+    \draw[darkblue] (\x,-0.1) -- (\x,0.1) node[below=2pt,font=\scriptsize] {\lab};
+  \draw[decorate,decoration={brace,amplitude=3pt,mirror},gray] (0,-0.85) -- (2,-0.85)
+    node[midway,below=2pt,gray,font=\scriptsize] {$h_{j-1}$};
+  \draw[decorate,decoration={brace,amplitude=3pt,mirror},gray] (2,-0.85) -- (5,-0.85)
+    node[midway,below=2pt,gray,font=\scriptsize] {$h_{j}$};
+\end{tikzpicture}
+\end{center}
+
+\vspace*{-16pt}
+{\small
+\[
+s_L=\tfrac{x_j-x_{j-1}}{h_{j-1}},\quad
+s_R=\tfrac{x_{j+1}-x_j}{h_j},\qquad
+|x''_j|\approx\frac{|\,s_R-s_L\,|}{\tfrac12(h_{j-1}+h_j)}
+\quad\text{(the analogue of }\tfrac{x_{j-1}-2x_j+x_{j+1}}{h^2}\text{)}.
+\]}
+
+%\vspace*{-4pt}
+{\small Each variable is scaled by its range; the interval weight
+$w_i=h_i\,|x''|\approx\int_{I_i}|x''|$ is equidistributed —
+$\max/\text{mean}$ of $w_i$ is the \texttt{equidistribution\_ratio}.}
+
+\end{frame}
+
+\begin{frame}{Grids -- When to stop (1): Richardson}
+
+\begin{itemize}
+
+\item We need a single \textbf{magnitude} for the tolerance test. Solve the
+  \emph{whole} path twice — on the mesh ($N$) and on the \textbf{bisected}
+  mesh ($2N$, every interval halved, so the $N{+}1$ nodes survive) — and
+  compare at those shared nodes. With order $p$ and exact path $x^\star$:
+  {\small\[
+  x_N - x^\star \approx C\,h^p,\quad
+  x_{2N} - x^\star \approx 2^{-p}C\,h^p
+  \;\Longrightarrow\;
+  \boxed{\,e_N \approx \tfrac{2^p}{2^p-1}\,\|x_N - x_{2N}\|\,},
+  \]}
+  with $\|\cdot\|$ the \textbf{max over nodes and variables}; $C$ and
+  $x^\star$ cancel.\newline
+
+\item This sizes the \textbf{global} error only — the doubled mesh is a
+  throwaway \emph{measurement}, not the refinement. \emph{Where} to add nodes
+  stays the curvature monitor's call (previous slide); Richardson just says
+  \emph{whether} to stop. Cost: one full extra solve per pass.\newline
+
+\item \textbf{Caveat.} It assumes the \emph{nominal} order $p$, so it badly
+  under-estimates the error at a \textbf{kink} and stops too early (next slide).
+
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Grids -- Why Richardson under-refines at a kink}
+
+\begin{itemize}
+
+\item The factor $\tfrac{2^p}{2^p-1}$ bakes in one assumption: each bisection
+  divides the error by $2^p$, so the $2N$ solution is far more accurate and
+  the gap $\|x_N-x_{2N}\|$ is essentially the whole coarse error.\newline
+
+\item \textbf{Smooth} (Gauss\,4, $p=4$): factor $=\dfrac{2^4}{2^4-1}=\dfrac{16}{15}\approx1.07$
+  — the gap \emph{is} the error. All good.\newline
+
+\item \textbf{Kink} — a \emph{corner} (continuous but the slope jumps: $\mathscr{C}^0$,
+  not $\mathscr{C}^1$): refining cuts the error by only
+  $\approx 2$ (order $1$), not $2^p$. The honest factor is
+  $\dfrac{2^1}{2^1-1}=2$, so the gap is just \emph{half} the true error.\newline
+
+\item Richardson still multiplies by $1.07$, so it reports about \emph{half}
+  the real error — meets the tolerance prematurely and stops while the kink is
+  under-resolved. \texttt{residual} assumes no order, so it does not fall for
+  this.
+
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Grids -- When to stop (2): the residual defect}
+
+\begin{itemize}
+
+\item \textbf{Residual / defect.} Fit a smooth interpolant $\tilde x(t)$
+  through the node values (a cubic spline), put it back into the ODE, and
+  measure how far it misses, at the interval midpoints:
+  \[
+  r_i \;=\; \bigl\|\, \tilde x'(t_{i+\frac12}) - g\!\bigl(\tilde x(t_{i+\frac12}),\,t_{i+\frac12}\bigr) \,\bigr\| .
+  \]
+
+\item \textbf{No order assumption} and \textbf{no extra solve}, so it stays
+  reliable at a \textbf{kink} — it keeps refining where Richardson would
+  quit. (\texttt{bvp5c} uses a calibrated version of this defect for
+  Lobatto IIIA.)\newline
+
+\item \textbf{Default}: curvature for placement $+$ \texttt{residual} for the
+  stop — cheap, and robust at the kinks adaptivity is meant for. Switch to
+  \texttt{monitor=richardson} for a calibrated tolerance on a smooth solve.
+
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Experiments -- A zero-lower-bound test bed}
+
+\begin{itemize}
+
+\item Nonlinear New-Keynesian model (\texttt{examples/nk-nonlinear}):
+  forward-looking consumption $C$ and inflation $\pi$, with the policy
+  rate at the \textbf{ZLB},
+  \[
+  R \;=\; \max\!\bigl(0,\; \rho + \phi_\pi\,\pi\bigr).
+  \]
+
+\item An anticipated $12\%$ TFP boom over $[0,3)$ lowers marginal cost
+  $\Rightarrow$ deflation $\Rightarrow$ the Taylor rule wants a negative
+  rate. The ZLB \textbf{binds on $\approx[0,2.46]$} ($\pi$ trough
+  $-6.6\%$).\newline
+
+\item The $\max$ makes the solution a \emph{corner} — continuous, but with a
+  jump in a derivative (only $C^0/C^1$, no smoother) — at the binding/exit
+  times; and the \textbf{exit time is endogenous} (where $\pi$ crosses
+  $-\rho/\phi_\pi$), so it does \emph{not} land on a node a priori. This
+  is the hard case for the schemes.
+
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Experiments -- Order: smooth vs.\ the kink}
+
+\begin{center}
+\includegraphics[width=0.9\linewidth]{exp_convergence}
+\end{center}
+
+\small
+Smooth (left): each family attains its order. Binding ZLB (right): all collapse
+to order $\approx 1$ — the kink, not the scheme, sets the accuracy.
+
+\smallskip
+\textbf{Why order 1?} The ZLB exit time is endogenous and rarely a node; a fixed
+mesh locates it only to within $O(h)$, and a \emph{corner displaced by $O(h)$
+gives an $O(h)$ error} — order 1, for \emph{any} scheme. The only cure is to put
+nodes there — i.e.\ refine adaptively.
+
+\end{frame}
+
+\begin{frame}{Experiments -- Adaptive refinement at the kink}
+
+\begin{center}
+\includegraphics[width=\linewidth]{exp_adaptive}
+\end{center}
+
+\small
+Adaptive nodes cluster at the endogenous ZLB exit (left). Per node, adaptive
+wins: adaptive CN reaches $6\times10^{-5}$ with \textbf{188 nodes} — the
+accuracy uniform Gauss\,$4$ needs \textbf{2401} nodes for (right).
+
+\end{frame}
+
+\begin{frame}{Experiments -- The error monitor matters}
+
+\begin{center}
+    \small
+    \renewcommand{\arraystretch}{1.3}
+    \begin{tabular}{lcc}
+        \toprule
+        adaptive solve (tol $10^{-5}$) & nodes & max error \\
+        \midrule
+        Crank--Nicolson, \texttt{residual}  & $188$ & $6.0\times10^{-5}$ \\
+        Gauss\,$4$, \texttt{residual}        & $188$ & $5.6\times10^{-5}$ \\
+        Gauss\,$4$, \texttt{richardson}      & $157$ & $7.0\times10^{-4}$ \\
+        \bottomrule
+    \end{tabular}
+\end{center}
+
+\begin{itemize}
+
+\item \texttt{richardson} rescales the coarse/fine gap by the
+  \emph{nominal} order. At a kink the realised order is $\approx 1$, so it
+  \textbf{underestimates} the error and stops refining too early.\newline
+
+\item \texttt{residual} measures the actual ODE defect of the solution —
+  no order assumption — so it keeps refining at the kink and converges.
+
+\end{itemize}
+
+\begin{alertblock}{Rule of thumb}
+At a kink, refine with the \texttt{residual} monitor; reserve
+\texttt{richardson} for smooth solves where its calibration holds.
+\end{alertblock}
+
+\end{frame}
+
+\begin{frame}{Experiments -- Anticipated vs.\ surprise}
+
+\begin{center}
+\includegraphics[width=\linewidth]{exp_shocks}
+\end{center}
+
+\small
+\textbf{Anticipated:} one belief, one segment. \textbf{Surprise:} a reveal at
+$t=1.5$ splits the horizon into two segments glued at an exact node; the
+ZLB-exit kink inside each segment stays endogenous (adaptive still helps).
+
+\end{frame}
+
+\begin{frame}{Experiments -- What to use when}
+
+\begin{itemize}
+
+\item \textbf{Smooth solution:} a higher-order scheme on a modest uniform
+  grid — Gauss for accuracy, Radau IIA when stiff.\newline
+
+\item \textbf{Known kink} (a reveal): nothing to do — it is placed on a
+  node automatically.\newline
+
+\item \textbf{Unknown kink} (occasionally-binding constraint): adaptive
+  refinement with the \texttt{residual} monitor; the scheme order barely
+  matters there, so Crank--Nicolson is a fine, robust base.\newline
+
+\item \emph{Schemes win when the solution is smooth; grids
+  win at kinks}.
+
+\end{itemize}
+
+\end{frame}
+
+%==============================================================================
 \section{Comparison with Dynare (discrete time models)}
 %==============================================================================
 
@@ -1551,26 +2042,29 @@ mainly because of BTF, but three effects:
 
 \begin{frame}{Conclusion -- Take-aways}
 
+\small
 \begin{itemize}
 
 \item Solving a perfect-foresight model = solving a two-point BVP =
   stacking the unknowns at every time slot and running Newton on a
   square block-sparse non-linear system.\newline
 
-\item \textbf{Crank--Nicolson} is the right default for
-  continuous-time economic models: second-order accurate, A-stable,
-  symmetric, only two points per stencil. It coincides with the
-  implicit-midpoint rule on smooth solutions, which is the form
-  Continuo uses internally.\newline
+\item \textbf{Crank--Nicolson} is the default — second-order, A-stable,
+  two-point stencil (the implicit-midpoint form). Beyond it,
+  \textbf{higher-order collocation} (Gauss / Radau IIA / Lobatto IIIA)
+  pays off on smooth solutions, while \textbf{adaptive grids} cluster
+  nodes at kinks. The ZLB is the cautionary tale: at a kink the order
+  collapses, and the lever is the grid (with the \texttt{residual}
+  monitor), not the scheme.\newline
 
 \item \textbf{Dynare} solves an analogous stacked Newton system but
   with an intrinsically discrete model, a 3-point stencil, and a sparse
   solve over its block-tridiagonal Jacobian.\newline
 
-\item Both designs share the same backbone: \emph{symbolic Jacobian +
-  sparse linear algebra + Newton}. The differences live in the
-  pre-processing step (discretise an ODE \emph{vs.}\ accept a difference
-  equation) and in how the resulting block structure is exploited.
+\item Both share one backbone — \emph{symbolic Jacobian + sparse linear
+  algebra + Newton} — differing in the pre-processing (discretise an ODE
+  \emph{vs.}\ accept a difference equation) and how the block structure is
+  exploited.
 
 \end{itemize}
 
@@ -1586,6 +2080,13 @@ mainly because of BTF, but three effects:
   (1996), \emph{Solving Ordinary Differential Equations II}. Iserles
   (2009), \emph{A First Course in the Numerical Analysis of
     Differential Equations}.\newline
+
+\item \textbf{Adaptive collocation and meshes.} de Boor (1973); Ascher,
+  Mattheij \& Russell (1995), \emph{Numerical Solution of Boundary Value
+    Problems for ODEs}; Kierzenka \& Shampine (2001), the \texttt{bvp4c}
+  residual-control solver. \textbf{Continuous-time perfect foresight:}
+  Trimborn, Koch \& Steger (2008), \emph{Multidimensional transitional
+    dynamics}, \emph{Macroeconomic Dynamics}.\newline
 
 \item \textbf{Dynare's algorithm.} Juillard (1996), \emph{Dynare:
     A program for the resolution and simulation of dynamic models with

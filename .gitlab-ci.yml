@@ -213,12 +213,18 @@ slides-pdf:
     changes:
       - doc/perfect-foresight/slides.tex
       - doc/perfect-foresight/btf_figure.py
-  # btf_figure.pdf is generated, not committed: build it from btf_figure.py
-  # (needs continuo + matplotlib in the venv, and libklu on the runner) before
-  # rubber includes it. The default before_script sets up the venv.
+      - doc/perfect-foresight/exp_convergence.py
+      - doc/perfect-foresight/exp_adaptive.py
+      - doc/perfect-foresight/exp_shocks.py
+  # The figure PDFs are generated, not committed: build them from their scripts
+  # (need continuo + matplotlib in the venv, and libklu on the runner) before
+  # rubber includes them. The default before_script sets up the venv.
   script:
     - pip install --quiet -e . matplotlib
     - python doc/perfect-foresight/btf_figure.py
+    - python doc/perfect-foresight/exp_convergence.py
+    - python doc/perfect-foresight/exp_adaptive.py
+    - python doc/perfect-foresight/exp_shocks.py
     - cd doc/perfect-foresight
     - rubber --shell-escape --pdf slides
   artifacts:
