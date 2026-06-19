@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <title>Coverage for src/continuo/ir/shocks.py: 98%</title>
+    <title>Coverage for src/continuo/ir/shocks.py: 100%</title>
     <link rel="icon" sizes="32x32" href="favicon_32_cb_c827f16f.png">
     <link rel="stylesheet" href="style_cb_4667309f.css" type="text/css">
     <script src="coverage_html_cb_dd2e7eb5.js" defer></script>
@@ -12,7 +12,7 @@
     <div class="content">
         <h1>
             <span class="text">Coverage for </span><b>src<span class="sep">/</span>continuo<span class="sep">/</span>ir<span class="sep">/</span>shocks.py</b>:
-            <span class="pc_cov">98%</span>
+            <span class="pc_cov">100%</span>
         </h1>
         <aside id="help_panel_wrapper">
             <input id="help_panel_state" type="checkbox">
@@ -54,9 +54,9 @@
             </div>
         </aside>
         <h2>
-            <span class="text">66 statements &nbsp;</span>
-            <button type="button" class="run button_toggle_run" value="run" data-shortcut="r" title="Toggle lines run">65<span class="text"> run</span></button>
-            <button type="button" class="mis show_mis button_toggle_mis" value="mis" data-shortcut="m" title="Toggle lines missing">1<span class="text"> missing</span></button>
+            <span class="text">61 statements &nbsp;</span>
+            <button type="button" class="run button_toggle_run" value="run" data-shortcut="r" title="Toggle lines run">61<span class="text"> run</span></button>
+            <button type="button" class="mis show_mis button_toggle_mis" value="mis" data-shortcut="m" title="Toggle lines missing">0<span class="text"> missing</span></button>
             <button type="button" class="exc show_exc button_toggle_exc" value="exc" data-shortcut="x" title="Toggle lines excluded">0<span class="text"> excluded</span></button>
         </h2>
         <p class="text">
@@ -65,7 +65,7 @@
             <a id="nextFileLink" class="nav" href="z_5202e292e99fa925_steady_state_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.14.1">coverage.py v7.14.1</a>,
-            created at 2026-06-17 17:53 +0000
+            created at 2026-06-19 13:54 +0000
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -100,15 +100,15 @@
     <p class="pln"><span class="n"><a id="t18" href="#t18">18</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t19" href="#t19">19</a></span><span class="t"><span class="key">from</span> <span class="nam">dataclasses</span> <span class="key">import</span> <span class="nam">replace</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t20" href="#t20">20</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t21" href="#t21">21</a></span><span class="t"><span class="key">from</span> <span class="nam">continuo</span><span class="op">.</span><span class="nam">ir</span><span class="op">.</span><span class="nam">errors</span> <span class="key">import</span> <span class="nam">IRError</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t22" href="#t22">22</a></span><span class="t"><span class="key">from</span> <span class="nam">continuo</span><span class="op">.</span><span class="nam">ir</span><span class="op">.</span><span class="nam">model</span> <span class="key">import</span> <span class="nam">Model</span><span class="op">,</span> <span class="nam">Shock</span><span class="op">,</span> <span class="nam">ShockPath</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t23" href="#t23">23</a></span><span class="t"><span class="key">from</span> <span class="nam">continuo</span><span class="op">.</span><span class="nam">parser</span><span class="op">.</span><span class="nam">ast</span> <span class="key">import</span> <span class="op">(</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t24" href="#t24">24</a></span><span class="t">    <span class="nam">Expr</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t25" href="#t25">25</a></span><span class="t">    <span class="nam">ModelFile</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t26" href="#t26">26</a></span><span class="t">    <span class="nam">NumberLit</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t27" href="#t27">27</a></span><span class="t">    <span class="nam">ShockEntry</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t28" href="#t28">28</a></span><span class="t">    <span class="nam">ShocksBlock</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t29" href="#t29">29</a></span><span class="t">    <span class="nam">UnaryOp</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t21" href="#t21">21</a></span><span class="t"><span class="key">from</span> <span class="nam">continuo</span><span class="op">.</span><span class="nam">ir</span><span class="op">.</span><span class="nam">_exprtools</span> <span class="key">import</span> <span class="nam">numeric_literal</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t22" href="#t22">22</a></span><span class="t"><span class="key">from</span> <span class="nam">continuo</span><span class="op">.</span><span class="nam">ir</span><span class="op">.</span><span class="nam">errors</span> <span class="key">import</span> <span class="nam">IRError</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t23" href="#t23">23</a></span><span class="t"><span class="key">from</span> <span class="nam">continuo</span><span class="op">.</span><span class="nam">ir</span><span class="op">.</span><span class="nam">model</span> <span class="key">import</span> <span class="nam">Model</span><span class="op">,</span> <span class="nam">Shock</span><span class="op">,</span> <span class="nam">ShockPath</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t24" href="#t24">24</a></span><span class="t"><span class="key">from</span> <span class="nam">continuo</span><span class="op">.</span><span class="nam">parser</span><span class="op">.</span><span class="nam">ast</span> <span class="key">import</span> <span class="op">(</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t25" href="#t25">25</a></span><span class="t">    <span class="nam">Expr</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t26" href="#t26">26</a></span><span class="t">    <span class="nam">ModelFile</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t27" href="#t27">27</a></span><span class="t">    <span class="nam">NumberLit</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t28" href="#t28">28</a></span><span class="t">    <span class="nam">ShockEntry</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t29" href="#t29">29</a></span><span class="t">    <span class="nam">ShocksBlock</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t30" href="#t30">30</a></span><span class="t"><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t31" href="#t31">31</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t32" href="#t32">32</a></span><span class="t"><span class="nam">__all__</span> <span class="op">=</span> <span class="op">[</span><span class="str">"attach_shocks"</span><span class="op">]</span>&nbsp;</span><span class="r"></span></p>
@@ -155,7 +155,7 @@
     <p class="run"><span class="n"><a id="t73" href="#t73">73</a></span><span class="t">            <span class="nam">value</span><span class="op">:</span> <span class="nam">float</span> <span class="op">|</span> <span class="key">None</span> <span class="op">=</span> <span class="num">0.0</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t74" href="#t74">74</a></span><span class="t">        <span class="key">else</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t75" href="#t75">75</a></span><span class="t">            <span class="nam">reveal</span> <span class="op">=</span> <span class="nam">assignment</span><span class="op">.</span><span class="nam">reveal_time</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t76" href="#t76">76</a></span><span class="t">            <span class="nam">value</span> <span class="op">=</span> <span class="nam">_literal</span><span class="op">(</span><span class="nam">assignment</span><span class="op">.</span><span class="nam">reveal_time</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t76" href="#t76">76</a></span><span class="t">            <span class="nam">value</span> <span class="op">=</span> <span class="nam">numeric_literal</span><span class="op">(</span><span class="nam">assignment</span><span class="op">.</span><span class="nam">reveal_time</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t77" href="#t77">77</a></span><span class="t">            <span class="key">if</span> <span class="nam">value</span> <span class="op">==</span> <span class="num">0.0</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t78" href="#t78">78</a></span><span class="t">                <span class="nam">explicit_zero</span> <span class="op">=</span> <span class="key">True</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t79" href="#t79">79</a></span><span class="t">        <span class="nam">items</span><span class="op">.</span><span class="nam">append</span><span class="op">(</span><span class="op">(</span><span class="nam">value</span><span class="op">,</span> <span class="nam">ShockPath</span><span class="op">(</span><span class="nam">reveal</span><span class="op">,</span> <span class="nam">assignment</span><span class="op">.</span><span class="nam">path</span><span class="op">)</span><span class="op">,</span> <span class="nam">assignment</span><span class="op">.</span><span class="nam">pos</span><span class="op">)</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
@@ -182,17 +182,8 @@
     <p class="run"><span class="n"><a id="t100" href="#t100">100</a></span><span class="t">        <span class="nam">seen</span><span class="op">.</span><span class="nam">add</span><span class="op">(</span><span class="nam">value</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t101" href="#t101">101</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t102" href="#t102">102</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t103" href="#t103">103</a></span><span class="t"><span class="key">def</span> <span class="nam">_literal</span><span class="op">(</span><span class="nam">expr</span><span class="op">:</span> <span class="nam">Expr</span><span class="op">)</span> <span class="op">-></span> <span class="nam">float</span> <span class="op">|</span> <span class="key">None</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t104" href="#t104">104</a></span><span class="t">    <span class="str">"""The numeric value of a reveal-time expression, or None if not a literal."""</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t105" href="#t105">105</a></span><span class="t">    <span class="key">if</span> <span class="nam">isinstance</span><span class="op">(</span><span class="nam">expr</span><span class="op">,</span> <span class="nam">NumberLit</span><span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t106" href="#t106">106</a></span><span class="t">        <span class="key">return</span> <span class="nam">expr</span><span class="op">.</span><span class="nam">value</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t107" href="#t107">107</a></span><span class="t">    <span class="key">if</span> <span class="nam">isinstance</span><span class="op">(</span><span class="nam">expr</span><span class="op">,</span> <span class="nam">UnaryOp</span><span class="op">)</span> <span class="key">and</span> <span class="nam">expr</span><span class="op">.</span><span class="nam">op</span> <span class="op">==</span> <span class="str">"-"</span> <span class="key">and</span> <span class="nam">isinstance</span><span class="op">(</span><span class="nam">expr</span><span class="op">.</span><span class="nam">operand</span><span class="op">,</span> <span class="nam">NumberLit</span><span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t108" href="#t108">108</a></span><span class="t">        <span class="key">return</span> <span class="op">-</span><span class="nam">expr</span><span class="op">.</span><span class="nam">operand</span><span class="op">.</span><span class="nam">value</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t109" href="#t109">109</a></span><span class="t">    <span class="key">return</span> <span class="key">None</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t110" href="#t110">110</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t111" href="#t111">111</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t112" href="#t112">112</a></span><span class="t"><span class="key">def</span> <span class="nam">_format</span><span class="op">(</span><span class="nam">value</span><span class="op">:</span> <span class="nam">float</span><span class="op">)</span> <span class="op">-></span> <span class="nam">str</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t113" href="#t113">113</a></span><span class="t">    <span class="key">return</span> <span class="nam">str</span><span class="op">(</span><span class="nam">int</span><span class="op">(</span><span class="nam">value</span><span class="op">)</span><span class="op">)</span> <span class="key">if</span> <span class="nam">value</span> <span class="op">==</span> <span class="nam">int</span><span class="op">(</span><span class="nam">value</span><span class="op">)</span> <span class="key">else</span> <span class="nam">str</span><span class="op">(</span><span class="nam">value</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t103" href="#t103">103</a></span><span class="t"><span class="key">def</span> <span class="nam">_format</span><span class="op">(</span><span class="nam">value</span><span class="op">:</span> <span class="nam">float</span><span class="op">)</span> <span class="op">-></span> <span class="nam">str</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t104" href="#t104">104</a></span><span class="t">    <span class="key">return</span> <span class="nam">str</span><span class="op">(</span><span class="nam">int</span><span class="op">(</span><span class="nam">value</span><span class="op">)</span><span class="op">)</span> <span class="key">if</span> <span class="nam">value</span> <span class="op">==</span> <span class="nam">int</span><span class="op">(</span><span class="nam">value</span><span class="op">)</span> <span class="key">else</span> <span class="nam">str</span><span class="op">(</span><span class="nam">value</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
 </main>
 <footer>
     <div class="content">
@@ -202,7 +193,7 @@
             <a class="nav" href="z_5202e292e99fa925_steady_state_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.14.1">coverage.py v7.14.1</a>,
-            created at 2026-06-17 17:53 +0000
+            created at 2026-06-19 13:54 +0000
         </p>
     </div>
 </footer>
