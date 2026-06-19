@@ -34,7 +34,7 @@ from continuo.solve.disc import (
     mesh_from_points,
     select_monitor,
 )
-from continuo.solve.pf import SolveStats, _row_split, solve_segment
+from continuo.solve.pf import SolveStats, solve_segment
 
 __all__ = ["refine_segment", "ADAPT_MONITORS"]
 
@@ -220,7 +220,6 @@ def _dynamic_residual(model: Model, residual: Residual, theta: dict[str, float],
     theta_dm = (
         ca.DM([theta[p] for p in model.parameters]) if model.parameters else ca.DM.zeros(0, 1)
     )
-    dynamic_rows, _ = _row_split(residual, model)
     exogenous = model.exogenous
 
     def f(t: float, x_full: np.ndarray, xdot_dynamic: np.ndarray) -> np.ndarray:
@@ -228,7 +227,7 @@ def _dynamic_residual(model: Model, residual: Residual, theta: dict[str, float],
         e_vec = (
             ca.DM([values.get(name, 0.0) for name in exogenous]) if exogenous else ca.DM.zeros(0, 1)
         )
-        out = residual.function(ca.DM(xdot_dynamic), ca.DM(x_full), e_vec, theta_dm, t)
-        return np.array(out).reshape(-1)[dynamic_rows]
+        out = residual.dynamic_function(ca.DM(xdot_dynamic), ca.DM(x_full), e_vec, theta_dm, t)
+        return np.array(out).reshape(-1)
 
     return f

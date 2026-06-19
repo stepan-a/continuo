@@ -250,8 +250,7 @@ def _build_system(
 ) -> tuple[ca.Function, ca.Function]:
     n = len(model.endogenous)
     n_dynamic = len(model.states) + len(model.jumps)
-    full = residual.function
-    _, algebraic_rows = _row_split(residual, model)
+    algebraic_residual = residual.algebraic_function
     index = {name: k for k, name in enumerate(model.endogenous)}
     points = grid.intervals + 1
     xdot_zero = ca.DM.zeros(n_dynamic, 1)
@@ -265,7 +264,7 @@ def _build_system(
     # unknowns (n per stage: n_dynamic derivatives then n_algebraic values).
     if scheme == "crank_nicolson":
         interval = crank_nicolson_residual(residual)
-        dynamic_rows, _ = _row_split(residual, model)
+        dynamic_rows = residual.dynamic_rows
         X = ca.SX.sym("X", n * points)
         interval_rows: list[ca.SX] = []
         midpoints = grid.midpoints
@@ -300,8 +299,7 @@ def _build_system(
     rows: list[ca.SX] = list(interval_rows)
     for j in range(points):
         t_j = grid.points[j]
-        pointwise = full(xdot_zero, _block(X, n, j), exogenous(t_j), theta, t_j)
-        rows.extend(pointwise[r] for r in algebraic_rows)
+        rows.append(algebraic_residual(xdot_zero, _block(X, n, j), exogenous(t_j), theta, t_j))
     for state in model.states:
         rows.append(_block(X, n, 0)[index[state]] - initial_states[state])
     for jump in model.jumps:
@@ -349,19 +347,6 @@ def _stage_seed(guess: np.ndarray, grid: Grid, tableau, n_dynamic: int) -> np.nd
             seeds.append(slope)
             seeds.append((1.0 - c) * x_i[n_dynamic:] + c * x_next[n_dynamic:])
     return np.concatenate(seeds) if seeds else np.zeros(0)
-
-
-def _row_split(residual: Residual, model: Model) -> tuple[list[int], list[int]]:
-    """Indices of the dynamic (depend on ẋ) and algebraic rows of F."""
-    n = residual.expression.shape[0]
-    dynamic_symbols = [residual.symbols.derivatives[name] for name in (*model.states, *model.jumps)]
-    if not dynamic_symbols:  # a purely algebraic model has no ẋ
-        return [], list(range(n))
-    # tr=True orients the result per equation (row) rather than per variable.
-    depends = ca.which_depends(residual.expression, ca.vertcat(*dynamic_symbols), 1, True)
-    dynamic = [r for r, d in enumerate(depends) if d]
-    algebraic = [r for r, d in enumerate(depends) if not d]
-    return dynamic, algebraic
 
 
 # ---------------------------------------------------------------------------

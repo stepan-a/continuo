@@ -36,7 +36,11 @@ class Residual:
 
     ``function`` maps ``(ẋ, x, e, θ, t)`` to the residual vector;
     ``jacobian_x`` and ``jacobian_xdot`` map the same inputs to ``∂F/∂x``
-    and ``∂F/∂ẋ`` respectively.
+    and ``∂F/∂ẋ`` respectively. ``dynamic_rows`` / ``algebraic_rows`` are the
+    row indices of ``F`` that do / do not depend on ``ẋ``, and
+    ``dynamic_function`` / ``algebraic_function`` return just those rows — so a
+    caller needing only one block (the stacked system's pointwise algebraic
+    rows, the residual monitor's dynamic defect) does not evaluate the other.
     """
 
     symbols: SymbolTable
@@ -44,6 +48,10 @@ class Residual:
     function: ca.Function
     jacobian_x: ca.Function
     jacobian_xdot: ca.Function
+    dynamic_rows: tuple[int, ...]
+    algebraic_rows: tuple[int, ...]
+    dynamic_function: ca.Function
+    algebraic_function: ca.Function
 
 
 def build_residual(model: Model) -> Residual:
@@ -75,7 +83,33 @@ def build_residual(model: Model) -> Residual:
     jacobian_x = combined.factory("jac_x", names, ["jac_x"])
     jacobian_xdot = combined.factory("jac_xdot", names, ["jac_xdot"])
 
-    return Residual(table, F, function, jacobian_x, jacobian_xdot)
+    # Split F's rows into those that depend on ẋ (dynamic) and those that do not
+    # (algebraic), and build a Function for each block, so a caller needing only
+    # one — the stacked system's pointwise algebraic rows, the monitor's dynamic
+    # defect — neither evaluates nor builds the graph for the other.
+    if xdot.numel() == 0:
+        dynamic_rows: tuple[int, ...] = ()
+        algebraic_rows: tuple[int, ...] = tuple(range(F.size1()))
+    else:
+        depends = ca.which_depends(F, xdot, 1, True)
+        dynamic_rows = tuple(r for r, d in enumerate(depends) if d)
+        algebraic_rows = tuple(r for r, d in enumerate(depends) if not d)
+    dyn_expr = ca.vertcat(*(F[r] for r in dynamic_rows)) if dynamic_rows else ca.SX.zeros(0, 1)
+    alg_expr = ca.vertcat(*(F[r] for r in algebraic_rows)) if algebraic_rows else ca.SX.zeros(0, 1)
+    dynamic_function = ca.Function("F_dyn", inputs, [dyn_expr], names, ["F_dyn"])
+    algebraic_function = ca.Function("F_alg", inputs, [alg_expr], names, ["F_alg"])
+
+    return Residual(
+        table,
+        F,
+        function,
+        jacobian_x,
+        jacobian_xdot,
+        dynamic_rows,
+        algebraic_rows,
+        dynamic_function,
+        algebraic_function,
+    )
 
 
 def _residual(eq, table: SymbolTable) -> ca.SX:

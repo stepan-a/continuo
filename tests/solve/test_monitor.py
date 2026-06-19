@@ -22,7 +22,6 @@ from continuo.solve.disc import (
     select_monitor,
     uniform_grid,
 )
-from continuo.solve.pf import _row_split
 from continuo.solve.steady import evaluate_parameters
 
 # A linear scalar ODE with the analytic solution K(t) = exp(lam*t).
@@ -120,13 +119,13 @@ def test_richardson_estimate_tracks_true_error():
 def _dynamic_residual(model, residual, theta):
     """Build (t, x_full, xdot_dyn) -> dynamic residual for the residual monitor."""
     theta_dm = ca.DM([theta[p] for p in model.parameters])
-    dynamic_rows, _ = _row_split(residual, model)
     n_exo = len(model.exogenous)
 
     def f(t: float, x_full: np.ndarray, xdot_dyn: np.ndarray) -> np.ndarray:
-        out = residual.function(ca.DM(xdot_dyn), ca.DM(x_full), ca.DM.zeros(n_exo, 1), theta_dm, t)
-        full = np.array(out).reshape(-1)
-        return full[dynamic_rows]
+        out = residual.dynamic_function(
+            ca.DM(xdot_dyn), ca.DM(x_full), ca.DM.zeros(n_exo, 1), theta_dm, t
+        )
+        return np.array(out).reshape(-1)
 
     return f
 
