@@ -7,9 +7,12 @@ which evaluation runs as compiled native code with negligible Python
 overhead.
 
 The compiled functions keep the same signatures as the interpreted ones
-(see :mod:`.residual`), so a :class:`CompiledResidual` is a drop-in
-replacement for a :class:`~continuo.codegen.residual.Residual`'s
-callables.
+(see :mod:`.residual`), so a :class:`CompiledResidual` can stand in for a
+:class:`~continuo.codegen.residual.Residual`'s ``function`` / ``jacobian_x`` /
+``jacobian_xdot``. It carries only those three callables — not the row-restricted
+``dynamic_function`` / ``algebraic_function`` (nor the ``dynamic_rows`` /
+``algebraic_rows`` indices) — so it is not a full substitute for a
+:class:`Residual` in the stacked-system or monitor paths.
 """
 
 from __future__ import annotations
@@ -33,7 +36,11 @@ _LIB_SUFFIX = {"linux": ".so", "darwin": ".dylib", "win32": ".dll"}.get(sys.plat
 
 @dataclass
 class CompiledResidual:
-    """Natively-compiled residual and Jacobians, with their on-disk artifacts."""
+    """The compiled ``F``, ``∂F/∂x`` and ``∂F/∂ẋ``, with their on-disk artifacts.
+
+    Carries only those three callables — not the row-restricted Functions or row
+    indices a full :class:`~continuo.codegen.residual.Residual` exposes.
+    """
 
     function: ca.Function
     jacobian_x: ca.Function
