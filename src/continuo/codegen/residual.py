@@ -61,9 +61,19 @@ def build_residual(model: Model) -> Residual:
 
     inputs = [xdot, x, e, theta, t]
     names = ["xdot", "x", "e", "theta", "t"]
-    function = ca.Function("F", inputs, [F], names, ["F"])
-    jacobian_x = ca.Function("jac_x", inputs, [ca.jacobian(F, x)], names, ["jac_x"])
-    jacobian_xdot = ca.Function("jac_xdot", inputs, [ca.jacobian(F, xdot)], names, ["jac_xdot"])
+    # Differentiate F once w.r.t. (x, ẋ) and split the columns, then assemble F
+    # and both Jacobian blocks as a single multi-output Function so CasADi shares
+    # one common-subexpression graph (and one C-codegen unit) across them. The
+    # three public views are pruned single-output factories, so a caller that
+    # needs only F — or only ∂F/∂x — does not evaluate the other blocks.
+    nx = x.size1()
+    jac = ca.jacobian(F, ca.vertcat(x, xdot))
+    combined = ca.Function(
+        "F_all", inputs, [F, jac[:, :nx], jac[:, nx:]], names, ["F", "jac_x", "jac_xdot"]
+    )
+    function = combined.factory("F", names, ["F"])
+    jacobian_x = combined.factory("jac_x", names, ["jac_x"])
+    jacobian_xdot = combined.factory("jac_xdot", names, ["jac_xdot"])
 
     return Residual(table, F, function, jacobian_x, jacobian_xdot)
 
