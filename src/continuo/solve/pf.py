@@ -219,10 +219,11 @@ def solve_segment(
         model, residual, grid, theta_dm, exogenous_at, initial_states, terminal_jumps, scheme, order
     )
     x0 = _initial_vector(guess, grid, model, scheme, order)
+    to_csc = _JacobianToCsc()
     if sym is None:
-        sym = solver.analyze(_to_csc(jacobian_fn(x0)))
+        sym = solver.analyze(to_csc(jacobian_fn(x0)))
     x, iterations, num = _newton(
-        residual_fn, jacobian_fn, x0, tol, max_iter, solver, sym, num, stats
+        residual_fn, jacobian_fn, x0, tol, max_iter, solver, sym, num, stats, to_csc
     )
     # The leading node block is the solution path; trailing stage unknowns
     # (collocation schemes) are internal and dropped here.
@@ -378,30 +379,35 @@ def _newton(
     sym: Any,
     num: Any = None,
     stats: SolveStats | None = None,
+    to_csc: _JacobianToCsc | None = None,
 ) -> tuple[np.ndarray, int, Any]:
     """Run Newton, returning ``(x, iterations, num)``.
 
     ``num`` may carry a factorisation from a previous segment (same sparsity
     pattern) to warm-start the pivots; the final factorisation is returned so
     the caller can carry it forward in turn. ``stats`` accumulates linear-solver
-    diagnostics in place.
+    diagnostics in place. ``to_csc`` reuses the constant Jacobian sparsity
+    pattern across steps (a fresh builder is created when ``None``).
     """
     stats = stats if stats is not None else SolveStats()
+    to_csc = to_csc if to_csc is not None else _JacobianToCsc()
 
-    def norm(z: np.ndarray) -> float:
-        value = np.linalg.norm(np.array(residual_fn(z)).reshape(-1), np.inf)
-        return value if np.isfinite(value) else np.inf
+    def residual(z: np.ndarray) -> np.ndarray:
+        return np.array(residual_fn(z)).reshape(-1)
 
+    g = residual(x)
     for iteration in range(1, max_iter + 1):
-        g = np.array(residual_fn(x)).reshape(-1)
         current = np.linalg.norm(g, np.inf)
         if current < tol:
             return x, iteration - 1, num
-        num = _refresh(solver, _to_csc(jacobian_fn(x)), sym, num, stats)
+        num = _refresh(solver, to_csc(jacobian_fn(x)), sym, num, stats)
         step = solver.solve(num, -g)
         if not np.all(np.isfinite(step)):
             raise SolveError("singular Jacobian in the perfect-foresight solve")
-        x = _line_search(x, step, current, norm)
+        # Carry the accepted line-search residual into the next iteration (its
+        # norm is the convergence test), so the residual is evaluated once per
+        # step instead of being recomputed at the top of the loop.
+        x, g = _line_search(x, step, current, residual)
     raise SolveError(
         "perfect-foresight solve did not converge; refine the grid or supply a better initial_guess"
     )
@@ -444,19 +450,50 @@ def _degraded(rcond: float | None) -> bool:
     return rcond is not None and rcond < _RCOND_FLOOR
 
 
-def _line_search(x: np.ndarray, step: np.ndarray, base: float, norm) -> np.ndarray:
+def _line_search(
+    x: np.ndarray, step: np.ndarray, base: float, residual: Callable[[np.ndarray], np.ndarray]
+) -> tuple[np.ndarray, np.ndarray]:
+    """Backtrack to a residual-decreasing step, returning ``(candidate, residual)``.
+
+    Returns the accepted candidate together with its residual vector so the
+    caller can reuse it as the next iterate's residual without re-evaluating.
+    """
     alpha = 1.0
     for _ in range(_LINE_SEARCH_STEPS):
         candidate = x + alpha * step
-        if norm(candidate) < base:
-            return candidate
+        g = residual(candidate)
+        if np.linalg.norm(g, np.inf) < base:
+            return candidate, g
         alpha *= 0.5
-    return x + alpha * step
+    candidate = x + alpha * step
+    return candidate, residual(candidate)
 
 
-def _to_csc(jacobian: ca.DM) -> csc_matrix:
-    rows, cols = jacobian.sparsity().get_triplet()
-    return csc_matrix((np.array(jacobian.nonzeros()), (rows, cols)), shape=jacobian.shape)
+class _JacobianToCsc:
+    """Build a CSC matrix from a CasADi Jacobian, caching the (constant) pattern.
+
+    The Jacobian ``Function`` has a fixed sparsity pattern, so the compressed-
+    column structure (``indptr`` / ``indices``) is captured from the first
+    evaluation and reused; later calls only refill the numeric ``data``. This
+    avoids re-extracting the triplet and rebuilding the matrix from scratch on
+    every Newton iteration.
+    """
+
+    __slots__ = ("_indptr", "_indices", "_shape")
+
+    def __init__(self) -> None:
+        self._indptr: np.ndarray | None = None
+        self._indices: np.ndarray = np.empty(0, dtype=np.int32)
+        self._shape: tuple[int, int] = (0, 0)
+
+    def __call__(self, jacobian: ca.DM) -> csc_matrix:
+        if self._indptr is None:
+            sp = jacobian.sparsity()
+            self._indptr = np.asarray(sp.colind(), dtype=np.int32)
+            self._indices = np.asarray(sp.row(), dtype=np.int32)
+            self._shape = jacobian.shape
+        data = np.asarray(jacobian.nonzeros(), dtype=float)
+        return csc_matrix((data, self._indices, self._indptr), shape=self._shape)
 
 
 # ---------------------------------------------------------------------------
