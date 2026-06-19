@@ -48,9 +48,8 @@ from continuo.solve.pf import SolveStats, initial_conditions, solve_segment
 from continuo.solve.refine import ADAPT_MONITORS, refine_segment
 from continuo.solve.rootfind import SteadySolver, select_steady_solver
 from continuo.solve.steady import (
-    directive_solver,
-    directive_solver_options,
     evaluate_parameters,
+    resolve_steady_directives,
     steady_state,
 )
 
@@ -104,10 +103,9 @@ def simulate(
     horizon, intervals, scheme, order, adapt, monitor, solver = _resolve_command(
         model, theta, horizon, intervals, scheme, order, adapt, monitor, solver
     )
-    if steady_solver is None:
-        steady_solver = directive_solver(model)
-        if steady_solver_options is None:
-            steady_solver_options = directive_solver_options(model)
+    steady_solver, steady_solver_options = resolve_steady_directives(
+        model, steady_solver, steady_solver_options
+    )
     # Resolve the steady backend once (validates name/options) and reuse the
     # instance for every internal steady-state solve.
     steady_backend = select_steady_solver(steady_solver, options=steady_solver_options)
@@ -145,11 +143,14 @@ def simulate(
         exogenous_at = _active_exogenous(schedule, start_time, param_symbols)
 
         terminal_ss = steady_state(
-            model, exogenous=exogenous_at(start_time + horizon), solver=steady_backend
+            model,
+            exogenous=exogenous_at(start_time + horizon),
+            solver=steady_backend,
+            nodomain=False,
         )
         if carried is None:
             initial_ss = steady_state(
-                model, exogenous=exogenous_at(start_time), solver=steady_backend
+                model, exogenous=exogenous_at(start_time), solver=steady_backend, nodomain=False
             )
             initial_states = initial_conditions(
                 model, theta, exogenous_at(start_time), initial_ss, steady_solver=steady_backend

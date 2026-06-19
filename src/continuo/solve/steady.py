@@ -89,6 +89,24 @@ def directive_nodomain(model: Model) -> bool:
     return any(query.nodomain for query in model.steady_queries)
 
 
+def resolve_steady_directives(
+    model: Model,
+    solver: str | SteadySolver | None,
+    options: dict[str, Any] | None,
+) -> tuple[str | SteadySolver | None, dict[str, Any] | None]:
+    """Fall back to the model's ``steady(solver=…, options=…)`` directive.
+
+    An explicit ``solver`` (or ``options``) wins; otherwise the directive's is
+    used. Shared by :func:`steady_state` and the simulate orchestrator so the
+    argument > directive > ``auto`` precedence lives in one place.
+    """
+    if solver is None:
+        solver = directive_solver(model)
+        if options is None:
+            options = directive_solver_options(model)
+    return solver, options
+
+
 _TOL = 1e-10
 _MAX_ITER = 50
 
@@ -113,7 +131,7 @@ def steady_state(
     guess: dict[str, float] | None = None,
     solver: str | SteadySolver | None = None,
     options: dict[str, Any] | None = None,
-    nodomain: bool = False,
+    nodomain: bool | None = None,
     tol: float = _TOL,
     max_iter: int = _MAX_ITER,
 ) -> dict[str, float]:
@@ -122,13 +140,18 @@ def steady_state(
     ``exogenous`` gives the values of the ``varexo`` (default 0); ``guess``
     seeds / overrides the numerical starting iterate. ``solver`` selects the
     nonlinear algorithm for the numerical path — a preset name, a
-    :class:`~continuo.solve.rootfind.SteadySolver` instance, or ``None`` (the
-    ``"auto"`` default). ``options`` configures the named preset (e.g.
+    :class:`~continuo.solve.rootfind.SteadySolver` instance, or ``None``, which
+    falls back to the model's ``steady(solver=…)`` directive, then to
+    ``"auto"``. ``options`` configures the named preset (e.g.
     ``{"strategy": "picard"}`` for ``kinsol``); both are ignored on the
     analytical path, which is a closed form. ``nodomain`` disables the domain
     change of variable, solving in raw ``x`` even when the model declares
-    constraints (debug, or to fall back when a solution saturates a bound).
+    constraints (debug, or to fall back when a solution saturates a bound);
+    ``None`` defers to the model's ``steady(nodomain)`` directive.
     """
+    solver, options = resolve_steady_directives(model, solver, options)
+    if nodomain is None:
+        nodomain = directive_nodomain(model)
     theta = evaluate_parameters(model)
     e = dict(exogenous or {})
     if model.steady_state:

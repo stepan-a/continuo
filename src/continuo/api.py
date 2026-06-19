@@ -21,9 +21,6 @@ from continuo.parser import parse as _parse_text
 from continuo.solve import (
     LinearSolver,
     SteadySolver,
-    directive_nodomain,
-    directive_solver,
-    directive_solver_options,
     simulate,
     steady_state,
 )
@@ -93,12 +90,6 @@ class Model:
         defers to the model's ``steady(nodomain)`` directive, an explicit
         bool overrides it.
         """
-        if solver is None:
-            solver = directive_solver(self._model)
-            if options is None:
-                options = directive_solver_options(self._model)
-        if nodomain is None:
-            nodomain = directive_nodomain(self._model)
         return steady_state(
             self._model,
             exogenous=exogenous,
