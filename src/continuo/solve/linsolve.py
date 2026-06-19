@@ -86,6 +86,10 @@ class LinearSolver(Protocol):
         """Reciprocal-condition estimate for the guard-rail, or ``None`` if unavailable."""
         ...
 
+    def nnz(self, num: Any) -> int | None:
+        """Factorisation fill ``nnz(L) + nnz(U)`` for diagnostics, or ``None`` if unavailable."""
+        ...
+
 
 class _SuperluSym:
     """SuperLU symbolic data: the COLAMD column permutation, reused every step."""
@@ -200,6 +204,9 @@ class KluSolver:
 
     def rcond(self, num: Any) -> float | None:
         return num.rcond
+
+    def nnz(self, num: Any) -> int | None:
+        return None  # KLU does not expose the factor fill here
 
 
 def _csc_arrays(a: csc_matrix) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -333,6 +340,9 @@ class PardisoSolver:
 
     def rcond(self, num: _PardisoNum) -> float | None:
         return None
+
+    def nnz(self, num: _PardisoNum) -> int | None:
+        return None  # pypardiso does not expose the factor fill
 
 
 def _umfpack_matrix(a: csc_matrix) -> csc_matrix:

@@ -427,14 +427,8 @@ def _refresh(solver: LinearSolver, a: csc_matrix, sym: Any, num: Any, stats: Sol
     rcond = solver.rcond(num)
     if rcond is not None:
         stats.min_rcond = rcond if stats.min_rcond is None else min(stats.min_rcond, rcond)
-    stats.fill = _fill(solver, num)
+    stats.fill = solver.nnz(num)
     return num
-
-
-def _fill(solver: LinearSolver, num: Any) -> int | None:
-    """The factorisation's ``nnz(L) + nnz(U)`` when the backend exposes it."""
-    reporter = getattr(solver, "nnz", None)
-    return reporter(num) if reporter is not None else None
 
 
 def _degraded(rcond: float | None) -> bool:
