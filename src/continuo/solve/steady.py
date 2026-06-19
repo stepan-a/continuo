@@ -129,6 +129,7 @@ def steady_state(
     *,
     exogenous: dict[str, float] | None = None,
     guess: dict[str, float] | None = None,
+    theta: dict[str, float] | None = None,
     solver: str | SteadySolver | None = None,
     options: dict[str, Any] | None = None,
     nodomain: bool | None = None,
@@ -147,12 +148,15 @@ def steady_state(
     analytical path, which is a closed form. ``nodomain`` disables the domain
     change of variable, solving in raw ``x`` even when the model declares
     constraints (debug, or to fall back when a solution saturates a bound);
-    ``None`` defers to the model's ``steady(nodomain)`` directive.
+    ``None`` defers to the model's ``steady(nodomain)`` directive. ``theta``
+    supplies pre-evaluated parameter values so a caller that already has them
+    skips re-resolving; ``None`` evaluates them here.
     """
     solver, options = resolve_steady_directives(model, solver, options)
     if nodomain is None:
         nodomain = directive_nodomain(model)
-    theta = evaluate_parameters(model)
+    if theta is None:
+        theta = evaluate_parameters(model)
     e = dict(exogenous or {})
     if model.steady_state:
         return _analytical(model, theta, e)

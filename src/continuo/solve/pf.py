@@ -126,7 +126,7 @@ def solve_pf(
     residual = build_residual(model)
     grid = uniform_grid(horizon, intervals)
 
-    ss = steady_state(model, exogenous=e, solver=steady_backend)
+    ss = steady_state(model, exogenous=e, theta=theta, solver=steady_backend, nodomain=False)
     initial_states = initial_conditions(model, theta, e, ss, steady_solver=steady_backend)
     terminal_jumps = {name: ss[name] for name in model.jumps}
     guess = np.tile([ss[name] for name in model.endogenous], (grid.intervals + 1, 1))
@@ -512,7 +512,9 @@ def initial_conditions(
         merged = {**e, **override}
         key = tuple(sorted(merged.items()))
         if key not in cache:
-            cache[key] = steady_state(model, exogenous=merged, solver=steady_solver)
+            cache[key] = steady_state(
+                model, exogenous=merged, theta=theta, solver=steady_solver, nodomain=False
+            )
         return cache[key]
 
     result: dict[str, float] = {}

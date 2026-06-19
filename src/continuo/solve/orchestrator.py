@@ -145,12 +145,17 @@ def simulate(
         terminal_ss = steady_state(
             model,
             exogenous=exogenous_at(start_time + horizon),
+            theta=theta,
             solver=steady_backend,
             nodomain=False,
         )
         if carried is None:
             initial_ss = steady_state(
-                model, exogenous=exogenous_at(start_time), solver=steady_backend, nodomain=False
+                model,
+                exogenous=exogenous_at(start_time),
+                theta=theta,
+                solver=steady_backend,
+                nodomain=False,
             )
             initial_states = initial_conditions(
                 model, theta, exogenous_at(start_time), initial_ss, steady_solver=steady_backend
