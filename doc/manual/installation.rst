@@ -11,11 +11,24 @@ Continuo targets Python 3.13 and above. Its runtime dependencies are:
 - SciPy ≥ 1.11 (sparse linear algebra),
 - `Lark <https://lark-parser.readthedocs.io/>`_ ≥ 1.1 (parser generator).
 
+From a release
+--------------
+
+For ordinary use there is no need to clone: install the wheel published with
+each `GitHub release <https://github.com/stepan-a/continuo/releases/latest>`_,
+substituting the version you want for ``X.Y.Z``:
+
+.. code-block:: console
+
+   $ pip install https://github.com/stepan-a/continuo/releases/download/vX.Y.Z/continuo-X.Y.Z-py3-none-any.whl
+
+The optional extras attach the same way, e.g.
+``pip install "continuo[pandas,xarray,hdf5] @ <wheel-url>"``.
+
 From a clone
 ------------
 
-The recommended way during development is an editable install from the
-repository root:
+For development, an editable install from the repository root:
 
 .. code-block:: console
 

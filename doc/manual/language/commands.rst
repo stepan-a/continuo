@@ -40,13 +40,13 @@ Arguments (all keyword):
    starting resolution. Omitted ⇒ a fixed uniform grid. See :doc:`/grids`.
 
 ``monitor`` (optional, preset name, requires ``adapt``)
-   The error monitor driving ``adapt`` — ``richardson`` (default) or
-   ``residual``. See :doc:`/grids`.
+   The error monitor driving ``adapt`` — ``residual`` (default) or
+   ``richardson``. See :doc:`/grids`.
 
 ``solver`` (optional, preset name, default ``auto``)
    The linear backend for the Newton solve — ``auto``, ``superlu``,
-   ``klu``, ``umfpack`` or ``pardiso``. Write the dashed preset as a
-   string: ``solver = "klu-nobtf"``. Unknown names are rejected when the
+   ``klu``, ``klu-nobtf``, ``umfpack`` or ``pardiso``. Write a dashed preset
+   as a string: ``solver = "klu-nobtf"``. Unknown names are rejected when the
    command is validated; whether a named backend is actually available is
    decided at solve time. An explicit ``solver=`` argument on the API or
    CLI overrides this directive. See :doc:`/solvers`.
@@ -88,7 +88,8 @@ Arguments (all keyword, all optional):
 ``solver`` (optional, preset name, default ``auto``)
    The nonlinear algorithm for the numerical steady-state solve —
    ``auto`` (default), ``newton``, ``hybr``, ``lm``, ``kinsol``,
-   ``homotopy``, and others. Hyphenated names go in a string:
+   ``homotopy``, ``broyden``, ``krylov``, ``df-sane`` or ``anderson``.
+   Hyphenated names go in a string:
    ``solver = "df-sane"``. Unknown names are rejected when the file is
    read; availability is checked at solve time. The directive sets the
    algorithm for *every* steady-state solve in the run (the terminal

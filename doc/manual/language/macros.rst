@@ -41,15 +41,53 @@ this is *not* the same thing as a model parameter):
    @#define ALPHA = 0.33
    @#define COUNTRIES = ["fr", "de", "it"]
 
-The right-hand side is a small expression language (numbers, strings,
-lists, tuples, arithmetic, comparisons, indexing). Inside model text,
-``@{...}`` interpolates the value of an expression at the place of the
-braces:
+With a parameter list, ``@#define`` instead binds a **macro function** — its
+body is evaluated with the arguments substituted for the parameters:
+
+.. code-block:: text
+
+   @#define spread(a, b) = a - b
+   @#define tagged(xs)   = [ "K_" + string(x) for x in xs ]
+
+The right-hand side is the macro expression language (see below). Inside
+model text, ``@{...}`` interpolates the value of an expression at the place
+of the braces:
 
 .. code-block:: text
 
    parameters alpha;
    alpha = @{ALPHA};
+
+The macro expression language
+-----------------------------
+
+Macro expressions — in ``@#define``, ``@{...}``, conditions, and ``@#for``
+iterables — are evaluated by a small language, distinct from the model's own
+expressions (:doc:`expressions`):
+
+- **Values**: integers and reals, strings, booleans (``true`` / ``false``),
+  lists ``[…]`` and tuples ``(…)``.
+- **Operators**: arithmetic ``+ - * / ^`` (``^`` is power), comparisons
+  ``== != < <= > >=``, membership ``in``, and boolean ``&&`` / ``||`` / ``!``.
+  ``+`` also concatenates two strings or two lists, and ``-`` between two
+  lists is set-difference (drop the right operand's elements from the left).
+- **Ranges**: ``a:b`` is the inclusive integer range (Dynare-style), so
+  ``1:3`` is ``[1, 2, 3]``.
+- **Indexing**: ``xs[i]`` is **1-based**, as in Dynare.
+- **List comprehensions**: ``[ f(x) for x in xs if cond ]``, with one or more
+  ``for`` / ``if`` clauses.
+- **Builtins**: maths (``exp``, ``ln``, ``log``, ``log10``, ``sqrt``, the
+  trigonometric and inverse-trigonometric functions, ``erf`` / ``erfc``),
+  numeric helpers (``abs``, ``sign``, ``floor``, ``ceil``, ``trunc``,
+  ``round``, ``mod``, ``power``, ``min`` / ``max``, ``sum``, ``length``,
+  ``normpdf`` / ``normcdf``), type predicates (``isreal``, ``isinteger``,
+  ``isstring``, ``isboolean``, ``isarray``, ``istuple``, ``isempty``), and the
+  casts / constructors ``string``, ``real``, ``bool``, ``range(lo, hi[,
+  step])``.
+
+These fold *macro* values at expansion time; they are unrelated to the
+model-level ``min`` / ``max`` / ``log`` that act on model variables at solve
+time.
 
 Conditionals
 ------------
@@ -78,8 +116,9 @@ is defined, regardless of its value:
 Loops
 -----
 
-``@#for`` iterates a name (or a parenthesised tuple of names) over a
-list, with an optional ``if`` filter:
+``@#for`` iterates a name (or a parenthesised tuple of names) over a list
+(to loop over a filtered subset, filter the list with a comprehension —
+``@#for x in [y for y in LIST if cond]``):
 
 .. code-block:: text
 
@@ -94,6 +133,23 @@ list, with an optional ``if`` filter:
 
 The body is expanded once per iteration with the loop variable(s) bound
 to the current value.
+
+Echo and diagnostics
+--------------------
+
+``@#echo`` and ``@#error`` evaluate a message expression at expansion time:
+``@#echo`` prints it (a build-time note), ``@#error`` aborts the expansion
+with it.
+
+.. code-block:: text
+
+   @#echo "building " + string(length(COUNTRIES)) + " countries"
+   @#if length(COUNTRIES) == 0
+   @#error "COUNTRIES is empty"
+   @#endif
+
+``@#echomacrovars`` dumps the current macro environment (every defined name
+and its value) — a debugging aid.
 
 Error reporting
 ---------------

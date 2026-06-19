@@ -82,7 +82,8 @@ When it helps (and when it doesn't)
 Adaptivity pays off when the solution is **smooth but localised** — a fast
 transient, a region of high curvature. The :doc:`RBC example <examples>`
 shows the capital transition refined from an equidistribution ratio of ~24
-down to ~1.5, concentrating nodes on the fast early adjustment. At a genuine
+down to ~1.5, concentrating nodes on the fast early adjustment (the ratio
+measures curvature-driven placement, independent of the stopping monitor). At a genuine
 **kink** (an occasionally-binding constraint) the curvature never smooths out,
 so the refiner would chase it indefinitely; that is why refinement is capped,
 and why pinning a node at the non-smoothness (as the shock machinery does for

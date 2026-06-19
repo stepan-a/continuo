@@ -274,5 +274,5 @@ The numerical path logs, at ``INFO`` level, which algorithm converged, the
 iteration count and the final residual norm — so when ``auto`` falls
 through to a later member of its chain, the log records which one won. A
 failed solve raises a ``SolveError`` carrying the residual norm reached and
-the per-backend attempts, pointing at a looser tolerance or a better
-``initial_guess``.
+the per-backend attempts, pointing at trying another ``solver=`` or supplying
+an ``initial_guess`` block.

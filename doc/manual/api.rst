@@ -56,15 +56,21 @@ with run-level summary information. The keys currently set are:
    guess is poorer; inspect the per-segment counts via
    ``[seg.iterations for seg in sol.segments]``.
 
+``equidistribution_ratio`` (``float``)
+   A cheap grid-adequacy hint: the ``max / mean`` of the per-interval
+   curvature over the solved path. Near ``1`` the grid is well balanced;
+   ``>> 1`` flags resolution misallocated relative to where the solution
+   bends, i.e. a candidate for adaptive refinement. See :doc:`grids`.
+
 ``solver`` (``str``)
    The linear backend that was used (e.g. ``"klu"``, ``"superlu"``).
    See :doc:`solvers`.
 
 ``factorizations`` / ``refactorizations`` (``int``)
    How many full factorisations versus cheap refactorisations the
-   backend performed over the run. With the cross-segment warm-start, a
-   two-segment surprise typically shows one factorisation and one
-   refactorisation.
+   backend performed over the run. With the cross-segment warm-start,
+   later segments refactor from the first segment's factorisation rather
+   than re-analysing, so refactorisations dominate.
 
 ``refactor_fallbacks`` (``int``)
    How many times a reused factorisation failed (a stale-pivot

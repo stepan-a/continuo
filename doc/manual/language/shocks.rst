@@ -104,10 +104,11 @@ segment and the jumps re-optimising at the reveal. Only the realised
 slice ``[t_i, t_{i+1})`` of each segment's solve is kept; the agents'
 counterfactual continuation beyond ``t_{i+1}`` is discarded.
 
-Reveal times are sorted by the parser; duplicates on the same shock are
-rejected, and mixing the bare ``path = …`` sugar with an explicit
-``path at t = 0 = …`` on the same shock is forbidden to keep the meaning
-unambiguous.
+Reveal times given as numeric literals are sorted and checked for duplicates
+when the model is read (a reveal time given as a parameter/expression flows
+through unsorted, with the never-arriving check deferred to the solver).
+Mixing the bare ``path = …`` sugar with an explicit ``path at t = 0 = …`` on
+the same shock is forbidden to keep the meaning unambiguous.
 
 Anticipated vs unanticipated
 ----------------------------

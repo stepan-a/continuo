@@ -11,6 +11,7 @@ Synopsis
 .. code-block:: console
 
    continuo MODEL.mod [-o OUTPUT.csv] [-T HORIZON] [-N INTERVALS]
+            [--scheme SCHEME] [--order ORDER] [--adapt TOL] [--monitor MONITOR]
             [--solver SOLVER] [--steady-solver SOLVER]
             [--steady-solver-option KEY=VALUE]
 
@@ -36,6 +37,23 @@ Options
 ``-N INTERVALS``, ``--intervals INTERVALS``
    Override the grid resolution ``N``. Integer, positive.
 
+``--scheme SCHEME``
+   Override the discretisation scheme from the ``simulate`` command —
+   ``crank_nicolson`` (default), ``gauss``, ``radau`` or ``lobatto_iiia``.
+   See :doc:`schemes`.
+
+``--order ORDER``
+   Collocation order for a multi-stage ``--scheme`` (integer; the family
+   default when omitted; not accepted for ``crank_nicolson``).
+
+``--adapt TOL``
+   Turn on adaptive mesh refinement to the error tolerance ``TOL`` (float);
+   ``N`` becomes the starting resolution. See :doc:`grids`.
+
+``--monitor MONITOR``
+   The error monitor driving ``--adapt`` — ``residual`` (default) or
+   ``richardson``. Requires ``--adapt``. See :doc:`grids`.
+
 ``--solver SOLVER``
    Choose the linear backend, overriding the ``simulate`` directive —
    ``auto`` (default), ``superlu``, ``klu``, ``klu-nobtf``, ``umfpack``
@@ -45,7 +63,8 @@ Options
 ``--steady-solver SOLVER``
    Choose the nonlinear steady-state algorithm, overriding the ``steady``
    directive — ``auto`` (default), ``newton``, ``hybr``, ``lm``,
-   ``kinsol``, ``homotopy`` and others. See :doc:`steady_solvers`.
+   ``kinsol``, ``homotopy``, ``broyden``, ``krylov``, ``df-sane`` or
+   ``anderson``. See :doc:`steady_solvers`.
 
 ``--steady-solver-option KEY=VALUE``
    Set a backend-specific option for the steady solver; repeatable, e.g.
@@ -75,10 +94,11 @@ Exit status
    Success.
 
 ``1``
-   A user-facing error: the file cannot be read, the macroprocessor /
-   parser / IR / codegen / solver rejected it, or the file has no
-   ``simulate`` command and neither ``-T`` nor ``-N`` were supplied. The error
-   message is written to ``stderr`` and is prefixed with ``continuo:``.
+   A user-facing error: the input file cannot be read, the output CSV cannot
+   be written, or the macroprocessor / parser / IR / codegen / solver
+   rejected it (a missing ``simulate`` command with no ``-T`` / ``-N``
+   override surfaces as a solver error). The message is written to
+   ``stderr``, prefixed with ``continuo:``.
 
 Anything else is a bug.
 

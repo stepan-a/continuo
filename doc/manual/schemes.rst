@@ -145,6 +145,7 @@ Crank–Nicolson) can be the steadier choice.
 
 .. note::
 
-   The grid is uniform. Non-uniform / adaptive meshes — placing nodes where
-   the solution varies fastest — are a planned extension built on this same
-   collocation machinery.
+   The schemes above run on a uniform grid by default, but the grid need not
+   be uniform: non-uniform and adaptively refined meshes — placing nodes where
+   the solution varies fastest — build on this same collocation machinery. See
+   :doc:`grids`.

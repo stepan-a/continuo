@@ -19,9 +19,9 @@ qualified by their dynamic role:
 The three roles are:
 
 ``state`` (predetermined)
-   Carries a time derivative — i.e. ``diff(state)`` appears on the left of
-   exactly one equation in the ``model`` block — and is pinned at ``t=0``
-   by an ``initval`` block.
+   Carries a time derivative — i.e. ``diff(state)`` appears in exactly one
+   equation of the ``model`` block — and is pinned at ``t=0`` by an
+   ``initval`` block.
 
 ``jump`` (forward-looking)
    Also carries a time derivative, but is *not* pinned at ``t=0``; the
@@ -31,9 +31,10 @@ The three roles are:
 ``var`` *(no qualifier)*
    Algebraic: no time derivative, defined by a static equation.
 
-The IR classifies a variable's role from the equations as well as the
-declaration, and rejects inconsistencies (e.g. a ``var(state)`` with no
-``diff(.)`` on a left-hand side, or two ``diff(x)`` definitions).
+The role is *declared*, not inferred: the IR validates each declared role
+against how the variable is used in the equations and rejects inconsistencies
+(e.g. a ``var(state)`` whose ``diff(.)`` never appears, or a variable both
+differentiated and pinned by a static equation).
 
 The qualifier may also carry a **domain constraint** (``positive`` /
 ``negative`` / ``boundaries=(lo, hi)``) that keeps the variable strictly
@@ -71,13 +72,15 @@ Parameter values may reference previously-assigned parameters and any
 literal expression that the model language accepts (arithmetic, ``exp``,
 ``log``, ``sqrt``, …). They are resolved once at solve time.
 
-Reserved names
---------------
+Special names
+-------------
 
-The identifier ``t`` is reserved: inside the ``shocks`` block it stands
-for the (continuous) time variable, and inside ``model`` and
-``steady_state_model`` blocks it is the time argument at which the
-expression is evaluated. ``diff`` and ``if`` are reserved as built-in
-functions; ``steady_state`` is reserved as the steady-state callable.
-The shock-shape helpers (``step``, ``pulse``, ``ramp``, ``bump``,
-``expdecay``, ``smoothstep``) are reserved inside ``shocks`` blocks only.
+A few identifiers carry a built-in meaning and should not be reused as
+variable names. (The grammar does not reserve them — they tokenise as ordinary
+identifiers — but each is special-cased downstream, so using one as a declared
+name is unsupported.) ``t`` is the (continuous) time variable: inside the
+``shocks`` block, and inside ``model`` and ``steady_state_model`` blocks the
+time argument at which the expression is evaluated. ``diff`` and ``if`` are
+built-in functions; ``steady_state`` is the steady-state callable. The
+shock-shape helpers (``step``, ``pulse``, ``ramp``, ``bump``, ``expdecay``,
+``smoothstep``) are built-in inside ``shocks`` blocks only.

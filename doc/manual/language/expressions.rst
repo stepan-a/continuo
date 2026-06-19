@@ -31,7 +31,7 @@ Any declared name resolves to its value at the point of evaluation:
 - a ``var`` (endogenous) resolves to its current state on the grid;
 - a ``varexo`` resolves to the value at the current time of the active
   shock path;
-- the reserved ``t`` resolves to the current time.
+- the built-in ``t`` resolves to the current time.
 
 Arithmetic operators
 --------------------

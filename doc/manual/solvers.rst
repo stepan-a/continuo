@@ -20,7 +20,8 @@ Choosing a backend
 -------------------
 
 Three entry points, from the most global to the most local — later ones
-override earlier ones (**CLI > directive > default**):
+override earlier ones (**argument > directive > default**, where the
+``solver=`` argument is passed via the Python API or the CLI):
 
 Python API
    Pass ``solver=`` to :meth:`continuo.Model.simul` (or to
@@ -92,11 +93,12 @@ optional packages. Naming an unavailable preset raises a ``SolveError``.
 ``auto`` (the default) routes by the discretisation scheme's *coupling
 stencil*:
 
-- **one-step** schemes (Crank–Nicolson — the only scheme implemented
-  today) are solved fastest by ``klu``: it amortises the symbolic
-  factorisation across Newton steps (and segments), which dominates the
-  per-iteration cost. ``auto`` picks ``klu`` when it is available, and
-  falls back to ``superlu`` otherwise (warning once).
+- **one-step** schemes (Crank–Nicolson and the collocation families —
+  Gauss–Legendre, Radau IIA, Lobatto IIIA, each coupling only an interval's
+  endpoints and its own stages) are solved fastest by ``klu``: it amortises
+  the symbolic factorisation across Newton steps (and segments), which
+  dominates the per-iteration cost. ``auto`` picks ``klu`` when it is
+  available, and falls back to ``superlu`` otherwise (warning once).
 
 So out of the box, a run uses KLU when ``libklu.so`` is installed and
 SuperLU otherwise — with no change in results, only in speed.
@@ -113,8 +115,9 @@ The backends
    A ``ctypes`` wrapper over SuiteSparse KLU. KLU separates the symbolic
    analysis from the numeric factorisation and reuses it across
    refactorisations, so each Newton step is a cheap ``refactor`` rather
-   than a full factorisation — the main reason it is ~7× faster than
-   SuperLU here. It also pre-orders into block triangular form (BTF),
+   than a full factorisation — the main reason it is ~4–7× faster than
+   SuperLU here (see the benchmarks below). It also pre-orders into block
+   triangular form (BTF),
    which on these models only peels the algebraic and boundary rows as
    1×1 blocks (the dynamic states/jumps couple forward and backward into
    one large irreducible block), so BTF is a secondary, sometimes neutral,
@@ -184,9 +187,9 @@ Each run records what the linear solver did in ``Solution.diagnostics``
 (see :doc:`api`): the backend used, the counts of full factorisations
 versus cheap refactorisations, the number of re-pivot fallbacks, the
 worst reciprocal-condition estimate over the run, and the factorisation
-fill. These make the cross-segment warm-start observable (a two-segment
-surprise shows one factorisation and one refactorisation) and surface a
-loss of conditioning before it becomes a failure.
+fill. These make the cross-segment warm-start observable (later segments
+refactor from the first segment's factorisation rather than re-analysing) and
+surface a loss of conditioning before it becomes a failure.
 
 Benchmarks
 ----------

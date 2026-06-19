@@ -87,3 +87,9 @@ Pure initial-value problems (states only, no jump)
 
 Each folder's README has the model equations, parameter values,
 references, and a brief discussion of the simulated dynamics.
+
+A few folders also ship auxiliary runners behind the figures in this manual:
+``examples/goodwin/run_schemes.py`` (the scheme/order accuracy comparison of
+:doc:`schemes`), ``examples/rbc/run_adapt.py`` (the adaptive-refinement run of
+:doc:`grids`), and ``examples/benchmark_solvers.py`` (the linear-solver
+timings of :doc:`solvers`).
