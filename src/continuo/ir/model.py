@@ -112,6 +112,10 @@ class Model:
     parameters: tuple[str, ...] = ()
     parameter_values: dict[str, Expr] = field(default_factory=dict)
     equations: tuple[Equation, ...] = ()
+    # First-order-reduction auxiliaries: aux state name -> (base variable,
+    # derivative order). Lets later passes recognise and render reduction
+    # auxiliaries (e.g. __aux_diff_x_2 ↔ diff(x, 2)) without parsing names.
+    aux_origin: dict[str, tuple[str, int]] = field(default_factory=dict)
     # Left-boundary data: state name -> initial-value expression (with the
     # auxiliary states keyed by their __aux_diff_ name). The solver's
     # optional starting iterate, keyed by endogenous variable.
@@ -150,3 +154,15 @@ class Model:
 
     def is_parameter(self, name: str) -> bool:
         return name in self.parameters
+
+    def is_auxiliary(self, name: str) -> bool:
+        """Whether ``name`` is a first-order-reduction auxiliary state."""
+        return name in self.aux_origin
+
+    def display_name(self, name: str) -> str:
+        """Render a reduction auxiliary as ``diff(base[, order])``; pass others through."""
+        origin = self.aux_origin.get(name)
+        if origin is None:
+            return name
+        base, order = origin
+        return f"diff({base})" if order == 1 else f"diff({base}, {order})"

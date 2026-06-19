@@ -31,8 +31,6 @@ from continuo.parser.ast import (
 
 __all__ = ["attach_steady_state"]
 
-_AUX_PREFIX = "__aux_diff_"
-
 
 def attach_steady_state(model: Model, model_file: ModelFile) -> Model:
     """Validate the steady_state_model block and attach it to the model."""
@@ -55,13 +53,13 @@ def _steady_state(model: Model, block: SteadyStateModelBlock | None) -> dict[str
             )
         defined[name] = assignment.rhs
 
-    missing = [v for v in model.endogenous if not v.startswith(_AUX_PREFIX) and v not in defined]
+    missing = [v for v in model.endogenous if not model.is_auxiliary(v) and v not in defined]
     if missing:
         raise IRError(f"steady_state_model is incomplete: no definition for {', '.join(missing)}")
 
     # Auxiliary derivative states are zero in steady state.
     for name in model.endogenous:
-        if name.startswith(_AUX_PREFIX) and name not in defined:
+        if model.is_auxiliary(name) and name not in defined:
             defined[name] = NumberLit(0.0)
     return defined
 

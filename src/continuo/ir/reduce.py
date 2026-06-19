@@ -37,7 +37,9 @@ from continuo.parser.ast import (
     VarKind,
 )
 
-__all__ = ["reduce_orders"]
+__all__ = ["reduce_orders", "aux_name", "AUX_PREFIX"]
+
+AUX_PREFIX = "__aux_diff_"
 
 
 def reduce_orders(model: Model) -> Model:
@@ -45,8 +47,9 @@ def reduce_orders(model: Model) -> Model:
     return _Reducer(model).run()
 
 
-def _aux_name(base: str, order: int) -> str:
-    return f"__aux_diff_{base}_{order}"
+def aux_name(base: str, order: int) -> str:
+    """The auxiliary state name standing for the ``order``-th derivative of ``base``."""
+    return f"{AUX_PREFIX}{base}_{order}"
 
 
 def _diff_call(name: str, pos: SourcePos | None) -> FunctionCall:
@@ -68,7 +71,7 @@ class _Reducer:
             )
             for eq in self._model.equations
         ]
-        aux_states, aux_jumps, aux_equations = self._build_auxiliaries()
+        aux_states, aux_jumps, aux_equations, aux_origin = self._build_auxiliaries()
         return Model(
             states=self._model.states + tuple(aux_states),
             jumps=self._model.jumps + tuple(aux_jumps),
@@ -77,6 +80,7 @@ class _Reducer:
             parameters=self._model.parameters,
             parameter_values=self._model.parameter_values,
             equations=tuple(equations) + tuple(aux_equations),
+            aux_origin=aux_origin,
         )
 
     # -- rewriting ----------------------------------------------------------
@@ -109,7 +113,7 @@ class _Reducer:
             return Identifier(subject.name, subject.pos)
         if order == 1:
             return _diff_call(subject.name, subject.pos)
-        return _diff_call(_aux_name(subject.name, order - 1), subject.pos)
+        return _diff_call(aux_name(subject.name, order - 1), subject.pos)
 
     def _effective(self, call: FunctionCall) -> tuple[Identifier, int]:
         """The base variable and total derivative order of a ``diff`` call."""
@@ -126,21 +130,25 @@ class _Reducer:
 
     # -- auxiliary variables ------------------------------------------------
 
-    def _build_auxiliaries(self) -> tuple[list[str], list[str], list[Equation]]:
+    def _build_auxiliaries(
+        self,
+    ) -> tuple[list[str], list[str], list[Equation], dict[str, tuple[str, int]]]:
         aux_states: list[str] = []
         aux_jumps: list[str] = []
         equations: list[Equation] = []
+        aux_origin: dict[str, tuple[str, int]] = {}
         for base, order in self._max_order.items():
             if order < 2:
                 continue
             bucket = self._aux_bucket(base, aux_states, aux_jumps)
             prev = base
             for j in range(1, order):
-                aux = _aux_name(base, j)
+                aux = aux_name(base, j)
                 equations.append(Equation(lhs=_diff_call(prev, None), rhs=Identifier(aux)))
                 bucket.append(aux)
+                aux_origin[aux] = (base, j)
                 prev = aux
-        return aux_states, aux_jumps, equations
+        return aux_states, aux_jumps, equations, aux_origin
 
     def _aux_bucket(self, base: str, aux_states: list[str], aux_jumps: list[str]) -> list[str]:
         kind = self._model.kind_of(base)

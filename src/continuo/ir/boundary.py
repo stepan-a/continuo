@@ -28,6 +28,7 @@ from dataclasses import replace
 
 from continuo.ir.errors import IRError
 from continuo.ir.model import Model
+from continuo.ir.reduce import aux_name
 from continuo.parser.ast import (
     DictLiteral,
     Expr,
@@ -43,8 +44,6 @@ from continuo.parser.ast import (
 )
 
 __all__ = ["attach_boundary"]
-
-_AUX_PREFIX = "__aux_diff_"
 
 
 def attach_boundary(model: Model, model_file: ModelFile) -> Model:
@@ -78,15 +77,15 @@ def _initial_values(model: Model, block: InitvalBlock | None) -> dict[str, Expr]
     for assignment in block.assignments:
         target, pos = _initval_target(model, assignment.lhs)
         if target in values:
-            raise IRError(f"duplicate initial value for {_display(target)!r}", pos)
+            raise IRError(f"duplicate initial value for {model.display_name(target)!r}", pos)
         values[target] = assignment.rhs
     for state in model.states:
         if state in values:
             continue
         if block.steady:
-            values[state] = _steady_fill(state, e_override)
+            values[state] = _steady_fill(model, state, e_override)
         else:
-            raise IRError(f"state {_display(state)!r} has no initial value in initval")
+            raise IRError(f"state {model.display_name(state)!r} has no initial value in initval")
     return values
 
 
@@ -105,8 +104,8 @@ def _steady_e(block: InitvalBlock) -> DictLiteral | None:
     return e_override
 
 
-def _steady_fill(state: str, e_override: DictLiteral | None) -> Expr:
-    if state.startswith(_AUX_PREFIX):
+def _steady_fill(model: Model, state: str, e_override: DictLiteral | None) -> Expr:
+    if model.is_auxiliary(state):
         return NumberLit(0.0)  # a derivative is zero in steady state
     kwargs = [KeywordArg(Identifier("e"), e_override)] if e_override is not None else []
     return FunctionCall(Identifier("steady_state"), [Identifier(state)], kwargs)
@@ -122,7 +121,7 @@ def _initval_target(model: Model, lhs: Expr) -> tuple[str, SourcePos | None]:
         return lhs.name, lhs.pos
     if isinstance(lhs, FunctionCall) and lhs.name.name == "diff":
         base, order = _diff_lhs(lhs)
-        target = base.name if order == 0 else f"{_AUX_PREFIX}{base.name}_{order}"
+        target = base.name if order == 0 else aux_name(base.name, order)
         if target not in model.states:
             raise IRError(
                 f"diff({base.name}) has no initial condition: {base.name!r} is not "
@@ -190,11 +189,3 @@ def _describe(model: Model, name: str) -> str:
     if model.is_parameter(name):
         return "a parameter"
     return "not declared"
-
-
-def _display(state: str) -> str:
-    """Render an auxiliary derivative state back as diff(x[, k]) for messages."""
-    if not state.startswith(_AUX_PREFIX):
-        return state
-    base, _, order = state[len(_AUX_PREFIX) :].rpartition("_")
-    return f"diff({base})" if order == "1" else f"diff({base}, {order})"
