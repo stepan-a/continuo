@@ -57,7 +57,7 @@ from continuo.solve.steady import (
 __all__ = ["simulate"]
 
 _DEFAULT_SCHEME = "crank_nicolson"
-_DEFAULT_MONITOR = "richardson"
+_DEFAULT_MONITOR = "residual"
 
 # Coupling stencil each scheme generates, which guides ``solver="auto"``:
 # CN and the collocation families are all one-step (each interval couples only
@@ -89,7 +89,8 @@ def simulate(
     is used when ``None``). ``adapt`` turns on adaptive mesh refinement: each
     segment is refined (curvature-equidistributed) and re-solved until the
     ``monitor`` error estimate falls below this tolerance — ``monitor`` is
-    ``"richardson"`` (default, a calibrated magnitude) or ``"residual"``.
+    ``"residual"`` (default; cheap and robust at kinks) or ``"richardson"``
+    (a calibrated magnitude, at one extra solve per pass).
     ``solver`` selects the linear backend (preset name,
     :class:`LinearSolver` instance, or the ``"auto"`` default).
     ``steady_solver`` selects the nonlinear algorithm for the internal

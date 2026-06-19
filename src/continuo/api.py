@@ -126,8 +126,8 @@ class Model:
         model's ``simulate`` command; ``order`` selects the collocation order
         of a multi-stage ``scheme`` (the family default when ``None``).
         ``adapt`` turns on adaptive mesh refinement to the given error
-        tolerance, driven by ``monitor`` (``"richardson"`` or ``"residual"``);
-        both override the directive. ``solver`` selects the linear backend: a
+        tolerance, driven by ``monitor`` (``"residual"`` by default, or
+        ``"richardson"``); both override the directive. ``solver`` selects the linear backend: a
         preset name (``"superlu"``, ``"auto"``), a :class:`LinearSolver`
         instance, or ``None`` (the ``"auto"`` default). ``steady_solver``
         selects the nonlinear algorithm for the internal steady-state solves,

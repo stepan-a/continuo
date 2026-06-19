@@ -29,7 +29,8 @@ follows [Semantic Versioning](https://semver.org).
   `scheme` / `order` (`--scheme`, `--order`) overrides.
 - `simulate` gains adaptive mesh refinement: `adapt=<tol>` refines the grid to
   an error tolerance (`N` becomes the starting resolution) and `monitor=`
-  chooses the estimator (`richardson` or `residual`); both are exposed on
+  chooses the estimator (`residual` by default — cheap and robust at kinks —
+  or `richardson`); both are exposed on
   `Model.simul` and the CLI (`--adapt`, `--monitor`). Shock reveal times are
   now placed on exact grid nodes rather than snapped to the nearest one.
 

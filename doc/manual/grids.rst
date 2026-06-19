@@ -52,15 +52,16 @@ The error monitor
 ``monitor`` chooses how the error is estimated for the stopping test (where to
 refine is always decided by the cheap curvature indicator):
 
-``richardson`` (default)
-   Solve once more on the bisected mesh and scale the difference by the
-   scheme order — a **calibrated** error magnitude, scheme-agnostic (it works
-   for Crank–Nicolson too). Costs one extra solve per pass.
-
-``residual``
+``residual`` (default)
    The ODE defect of a smooth interpolant of the node values — an indicator
-   that needs **no extra solve**, so it is cheaper, if less precisely
-   calibrated.
+   that needs **no extra solve** and makes no order assumption, so it stays
+   reliable at a kink. The cheap, robust default.
+
+``richardson``
+   Solve once more on the bisected mesh and scale the difference by the
+   scheme order — a **calibrated** error magnitude, scheme-agnostic. Costs one
+   extra solve per pass, and assumes the *nominal* order, so it under-refines
+   at a kink; prefer it for a trustworthy tolerance on a smooth solve.
 
 (The placement-only ``curvature`` monitor has no error magnitude and so cannot
 drive ``adapt``.)

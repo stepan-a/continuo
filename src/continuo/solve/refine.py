@@ -10,10 +10,11 @@ nodes.
 
 Two error estimators (the ``monitor=`` choice) decide convergence:
 
-- ``richardson`` (default) — a calibrated error magnitude from a solve on the
+- ``residual`` (default) — the ODE defect of a smooth interpolant; no extra
+  solve, and robust at a kink (no order assumption).
+- ``richardson`` — a calibrated error magnitude from a solve on the
   once-bisected mesh, scaled by the scheme order. Costs one extra solve per
-  pass, scheme-agnostic (covers Crank–Nicolson).
-- ``residual`` — the ODE defect of a smooth interpolant; no extra solve.
+  pass and assumes the nominal order (so it under-refines at a kink).
 
 Placement (where to refine) always uses the cheap curvature indicator.
 """
