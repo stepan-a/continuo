@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+from continuo.ir._exprtools import numeric_literal
 from continuo.ir.errors import IRError
 from continuo.ir.model import Model, Shock, ShockPath
 from continuo.parser.ast import (
@@ -26,7 +27,6 @@ from continuo.parser.ast import (
     NumberLit,
     ShockEntry,
     ShocksBlock,
-    UnaryOp,
 )
 
 __all__ = ["attach_shocks"]
@@ -73,7 +73,7 @@ def _shock(name: str, entry: ShockEntry) -> Shock:
             value: float | None = 0.0
         else:
             reveal = assignment.reveal_time
-            value = _literal(assignment.reveal_time)
+            value = numeric_literal(assignment.reveal_time)
             if value == 0.0:
                 explicit_zero = True
         items.append((value, ShockPath(reveal, assignment.path), assignment.pos))
@@ -98,15 +98,6 @@ def _reject_duplicate_reveal_times(name: str, items: list) -> None:
         if value in seen:
             raise IRError(f"shock {name!r}: duplicate path at t={_format(value)}", pos)
         seen.add(value)
-
-
-def _literal(expr: Expr) -> float | None:
-    """The numeric value of a reveal-time expression, or None if not a literal."""
-    if isinstance(expr, NumberLit):
-        return expr.value
-    if isinstance(expr, UnaryOp) and expr.op == "-" and isinstance(expr.operand, NumberLit):
-        return -expr.operand.value
-    return None
 
 
 def _format(value: float) -> str:

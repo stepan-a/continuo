@@ -18,19 +18,15 @@ A time derivative is written ``diff(x)`` or ``diff(x, p)`` (and nested
 
 from __future__ import annotations
 
-from collections.abc import Iterator
-
+from continuo.ir._exprtools import walk
 from continuo.ir.errors import IRError
 from continuo.ir.model import Model
 from continuo.parser.ast import (
-    BinaryOp,
-    DictLiteral,
     Equation,
     Expr,
     FunctionCall,
     Identifier,
     SourcePos,
-    UnaryOp,
     VarKind,
 )
 
@@ -68,24 +64,7 @@ def _scan(
 
 
 def _diff_calls(expr: Expr) -> list[FunctionCall]:
-    return [n for n in _walk(expr) if isinstance(n, FunctionCall) and n.name.name == "diff"]
-
-
-def _walk(expr: Expr) -> Iterator[Expr]:
-    yield expr
-    if isinstance(expr, UnaryOp):
-        yield from _walk(expr.operand)
-    elif isinstance(expr, BinaryOp):
-        yield from _walk(expr.left)
-        yield from _walk(expr.right)
-    elif isinstance(expr, FunctionCall):
-        for arg in expr.args:
-            yield from _walk(arg)
-        for kw in expr.kwargs:
-            yield from _walk(kw.value)
-    elif isinstance(expr, DictLiteral):
-        for entry in expr.entries:
-            yield from _walk(entry.value)
+    return [n for n in walk(expr) if isinstance(n, FunctionCall) and n.name.name == "diff"]
 
 
 def _diff_subject(call: FunctionCall) -> Identifier:

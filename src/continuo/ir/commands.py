@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+from continuo.ir._exprtools import numeric_literal
 from continuo.ir.errors import IRError
 from continuo.ir.model import Model, Simulation, SteadyQuery
 from continuo.parser.ast import (
@@ -25,11 +26,9 @@ from continuo.parser.ast import (
     Expr,
     Identifier,
     ModelFile,
-    NumberLit,
     SimulateCommand,
     SteadyCommand,
     StringLit,
-    UnaryOp,
 )
 
 __all__ = ["attach_commands"]
@@ -148,7 +147,7 @@ def _order(scheme: str, value: Expr | None) -> int | None:
     """The collocation order for ``scheme``; ``None`` when unspecified (family default)."""
     if value is None:
         return None
-    n = _literal(value)
+    n = numeric_literal(value)
     if n is None or n <= 0 or n != int(n):
         raise IRError("simulate order must be a positive integer", getattr(value, "pos", None))
     if scheme == "crank_nicolson":
@@ -171,7 +170,7 @@ def _adapt(value: Expr | None) -> Expr | None:
     """The adaptive-refinement tolerance expression; ``None`` when unspecified."""
     if value is None:
         return None
-    literal = _literal(value)
+    literal = numeric_literal(value)
     if literal is not None and literal <= 0:
         raise IRError("simulate adapt tolerance must be positive", getattr(value, "pos", None))
     return value
@@ -216,7 +215,7 @@ def _solver(value: Expr | None) -> str | None:
 
 
 def _check_positive(name: str, expr: Expr, *, integer: bool) -> None:
-    value = _literal(expr)
+    value = numeric_literal(expr)
     if value is None:  # a parameter or expression; checked once evaluated
         return
     kind = "a positive integer" if integer else "positive"
@@ -234,7 +233,7 @@ def _steady(cmd: SteadyCommand) -> SteadyQuery:
     kwargs = _collect(cmd.kwargs, allowed=("t", "e", "solver", "options"), what="steady")
     time = kwargs.get("t")
     if time is not None:
-        value = _literal(time)
+        value = numeric_literal(time)
         if value is not None and value < 0:
             raise IRError("steady t must be non-negative", getattr(time, "pos", None))
     exogenous = kwargs.get("e")
@@ -315,7 +314,7 @@ def _option_value(expr: Expr) -> object:
         return expr.value
     if isinstance(expr, Identifier):
         return expr.name
-    number = _literal(expr)  # NumberLit or negated NumberLit
+    number = numeric_literal(expr)  # NumberLit or negated NumberLit
     if number is not None:
         return int(number) if number == int(number) else number
     raise IRError(
@@ -339,11 +338,3 @@ def _collect(kwargs: list, *, allowed: tuple[str, ...], what: str) -> dict[str, 
             raise IRError(f"duplicate {what} option {key!r}", kw.pos)
         options[key] = kw.value
     return options
-
-
-def _literal(expr: Expr) -> float | None:
-    if isinstance(expr, NumberLit):
-        return expr.value
-    if isinstance(expr, UnaryOp) and expr.op == "-" and isinstance(expr.operand, NumberLit):
-        return -expr.operand.value
-    return None
