@@ -71,6 +71,33 @@ follows [Semantic Versioning](https://semver.org).
   `diagnostics["equidistribution_ratio"]` as a grid-adequacy hint. See the
   RBC example.
 
+### Performance
+
+- The perfect-foresight Newton loop does less work per iteration: the line
+  search carries its accepted residual into the next iterate (one fewer full
+  residual evaluation per step), and the stacked Jacobian's constant sparsity
+  pattern is captured once and refilled rather than rebuilt from a triplet on
+  every step.
+- The model residual `F` and its Jacobian blocks `∂F/∂x` and `∂F/∂ẋ` are built
+  as a single CasADi graph (one common-subexpression pass) and exposed as pruned
+  single-output views, so a caller needing only one block does not evaluate the
+  others.
+- `F`'s rows are split once into dynamic (depend on `ẋ`) and algebraic; the
+  stacked system's pointwise constraints and the residual monitor each evaluate
+  only the rows they use, instead of the full residual.
+- Model parameters are evaluated once per run and threaded into every
+  steady-state solve (the terminal / initial anchors and `initval` overrides)
+  rather than being re-resolved on each call.
+
+### Fixed
+
+- The perfect-foresight Newton now raises a clear "line search found no
+  residual-decreasing step" error (pointing at the grid / `initial_guess`)
+  instead of silently taking a non-descent step and stalling to a generic
+  non-convergence message.
+- The `continuo` CLI reports a clean error when the output CSV cannot be written
+  (e.g. an unwritable path), rather than a bare traceback.
+
 ## [0.0.3] — 2026-06-16
 
 ### Solver
